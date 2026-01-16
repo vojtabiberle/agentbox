@@ -55,7 +55,7 @@ if ! podman image exists "$IMAGE_NAME"; then
     echo ""
 
     podman build -t "$IMAGE_NAME" -f - <<'DOCKERFILE'
-FROM fedora:41
+FROM fedora:42
 
 # Base dev tools
 RUN dnf install -y \
