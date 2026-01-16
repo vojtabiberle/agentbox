@@ -4,7 +4,8 @@ Future development ideas for agentbox.
 
 ## Container Runtime
 
-- [x] Rootless Docker support (alternative to Podman)
+- [x] Rootless Podman support (with `--userns=keep-id` and SELinux `:Z` labels)
+- [x] Rootless Docker support (with `--user UID:GID`)
 
 ## Configuration
 
