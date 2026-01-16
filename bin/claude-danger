@@ -11,16 +11,22 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 IMAGE_NAME="claude-danger"
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 
 usage() {
     echo "Usage: claude-danger <workspace-directory>"
     echo ""
-    echo "Run Claude Code in an isolated Podman container with access"
+    echo "Run Claude Code in an isolated container with access"
     echo "only to the specified workspace directory."
+    echo ""
+    echo "Environment variables:"
+    echo "  CONTAINER_ENGINE  Container runtime to use (default: podman)"
+    echo "                    Set to 'docker' to use Docker instead"
     echo ""
     echo "Examples:"
     echo "  claude-danger ~/worktrees/myproject/claude-work"
     echo "  claude-danger ~/workspace/feature-name"
+    echo "  CONTAINER_ENGINE=docker claude-danger ~/workspace"
     exit 1
 }
 
@@ -49,12 +55,12 @@ if [[ ! -d "$WORKSPACE" ]]; then
 fi
 
 # Build image if it doesn't exist
-if ! podman image exists "$IMAGE_NAME"; then
+if ! $CONTAINER_ENGINE image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo -e "${CYAN}Building $IMAGE_NAME image (first run only)...${NC}"
     echo "This will take a few minutes."
     echo ""
 
-    podman build -t "$IMAGE_NAME" -f - <<'DOCKERFILE'
+    $CONTAINER_ENGINE build -t "$IMAGE_NAME" -f - <<'DOCKERFILE'
 FROM fedora:41
 
 # Base dev tools
@@ -132,22 +138,32 @@ echo ""
 
 # Copy credentials to persistent volume on first run
 CLAUDE_VOLUME="claude-danger-config"
-if ! podman volume exists "$CLAUDE_VOLUME"; then
+if ! $CONTAINER_ENGINE volume inspect "$CLAUDE_VOLUME" >/dev/null 2>&1; then
     echo -e "${CYAN}Creating persistent config volume...${NC}"
-    podman volume create "$CLAUDE_VOLUME"
+    $CONTAINER_ENGINE volume create "$CLAUDE_VOLUME"
     # Copy credentials into volume
-    podman run --rm \
+    $CONTAINER_ENGINE run --rm \
         -v "$CLAUDE_VOLUME":/config \
         -v "$HOME/.claude/.credentials.json:/src/credentials.json:ro,Z" \
         alpine sh -c "mkdir -p /config/.claude && cp /src/credentials.json /config/.claude/.credentials.json && chmod 600 /config/.claude/.credentials.json"
 fi
 
 # Run container - rootless with persistent config volume
-exec podman run -it --rm \
+# Build engine-specific options
+RUN_OPTS=()
+if [[ "$CONTAINER_ENGINE" == "podman" ]]; then
+    # Podman: use keep-id to map container user to host user
+    RUN_OPTS+=(--userns=keep-id)
+else
+    # Docker: run as current user
+    RUN_OPTS+=(-u "$(id -u):$(id -g)")
+fi
+
+exec $CONTAINER_ENGINE run -it --rm \
     -v "$WORKSPACE":/workspace:Z \
     -v "$CLAUDE_VOLUME":/home/user:Z \
     -w /workspace \
-    --userns=keep-id \
+    "${RUN_OPTS[@]}" \
     --security-opt=no-new-privileges \
     --hostname=claude-sandbox \
     -e TERM="$TERM" \
@@ -155,4 +171,3 @@ exec podman run -it --rm \
     -e PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin" \
     "$IMAGE_NAME" \
     claude --dangerously-skip-permissions
-[bazil@silverblue ~]$

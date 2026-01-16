@@ -1,6 +1,6 @@
 # claude-danger
 
-Run Claude Code in an isolated Podman container with access only to a specified workspace directory.
+Run Claude Code in an isolated container (Podman or Docker) with access only to a specified workspace directory.
 
 ## Why?
 
@@ -8,7 +8,7 @@ Claude Code with `--dangerously-skip-permissions` is powerful but risky on your 
 
 ## Prerequisites
 
-- [Podman](https://podman.io/) installed and configured for rootless operation
+- [Podman](https://podman.io/) (default) or [Docker](https://www.docker.com/) installed
 - Claude Code credentials at `~/.claude/.credentials.json` (run `claude` once to authenticate)
 
 ## Installation
@@ -27,7 +27,16 @@ Or just copy `bin/claude-danger` anywhere in your PATH.
 
 ```bash
 claude-danger <workspace-directory>
+
+# Use Docker instead of Podman
+CONTAINER_ENGINE=docker claude-danger <workspace-directory>
 ```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CONTAINER_ENGINE` | `podman` | Container runtime to use (`podman` or `docker`) |
 
 ### Examples
 
@@ -94,8 +103,8 @@ The container is based on Fedora 41 and includes:
 ## How it works
 
 - **Workspace isolation**: Only the specified directory is mounted at `/workspace`
-- **Persistent credentials**: Claude credentials are stored in a Podman volume (`claude-danger-config`) and reused across runs
-- **Rootless security**: Runs with `--userns=keep-id` (your UID inside container) and `--security-opt=no-new-privileges`
+- **Persistent credentials**: Claude credentials are stored in a container volume (`claude-danger-config`) and reused across runs
+- **Rootless security**: Runs with `--userns=keep-id` (Podman) or `-u $(id -u):$(id -g)` (Docker) and `--security-opt=no-new-privileges`
 - **No network restrictions**: Container has full network access for package installation, API calls, etc.
 
 ## Limitations
