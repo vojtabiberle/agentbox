@@ -145,7 +145,7 @@ claude:
 ## How it works
 
 - **Workspace isolation**: Only the specified directory is mounted at `/workspace`
-- **Persistent credentials**: Claude credentials stored in a named volume, reused across runs
+- **Claude credentials**: `~/.claude` mounted read-write (shared with host)
 - **Rootless security**: Runs with `--userns=keep-id` and `--security-opt=no-new-privileges`
 - **No network restrictions**: Full network access for package installation and API calls
 
