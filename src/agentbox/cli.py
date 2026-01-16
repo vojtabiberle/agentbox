@@ -160,7 +160,7 @@ def _print_banner(
         console.print(line(text, 31))  # 2 + 10 + 10 + 9 = 31
     else:
         text = f"  [yellow]DANGER ZONE[/yellow] - Running {agent}"
-        console.print(line(text, 23 + len(agent)))  # 2 + 11 + 10 + agent
+        console.print(line(text, 24 + len(agent)))  # 2 + 11 + 10 + agent
 
     text = "  [cyan]Read-Write:[/cyan]"
     console.print(line(text, 13))  # 2 + 11
@@ -177,7 +177,7 @@ def _print_banner(
 
     console.print(line("", 0))
     text = "  Everything else on your system is [green]isolated[/green]"
-    console.print(line(text, 45))  # 2 + 35 + 8
+    console.print(line(text, 44))  # 2 + 35 + 8
 
     console.print("[red]╚" + "═" * W + "╝[/red]")
     console.print()
