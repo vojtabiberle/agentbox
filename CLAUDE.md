@@ -4,22 +4,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-agentbox provides `claude-danger`, a bash script that runs Claude Code inside an isolated Podman container. The container has access only to a specified workspace directory, keeping the rest of the system isolated.
+agentbox is a Python CLI that runs AI coding agents (Claude Code, etc.) inside isolated Podman/Docker containers. The container has access only to a specified workspace directory, keeping the rest of the system isolated.
 
-## Usage
+## Development Commands
 
 ```bash
-bin/claude-danger <workspace-directory>
-```
+# Install in development mode
+pip install -e .
 
-The script:
-1. Creates the workspace directory if it doesn't exist
-2. Builds a Fedora 41-based container image on first run (includes Node.js, Python, Go, Rust, PHP, and cloud CLIs)
-3. Creates a persistent volume for Claude credentials
-4. Runs Claude Code with `--dangerously-skip-permissions` inside the container
+# Run locally
+agentbox run ~/workspace
+agentbox run ~/workspace --bash
+agentbox build --rebuild
+
+# Run tests (when added)
+pytest
+```
 
 ## Architecture
 
-- **bin/claude-danger**: Main entry point. Self-contained bash script that embeds the Dockerfile as a heredoc and handles container lifecycle via Podman.
-- **claude-danger-config volume**: Persistent Podman volume storing Claude credentials across runs.
-- Container runs rootless with `--userns=keep-id` and `--security-opt=no-new-privileges`.
+```
+src/agentbox/
+├── cli.py          # Click CLI entrypoint (run, build, config commands)
+├── config.py       # Pydantic config model, YAML loading from ~/.config/agentbox/
+├── container.py    # Podman/Docker runtime abstraction
+├── image.py        # Dockerfile building via Jinja2 templates
+├── agents/         # Agent implementations
+│   ├── base.py     # Agent ABC
+│   └── claude.py   # Claude Code agent
+└── templates/
+    └── Dockerfile.j2   # Jinja2 template with toolset conditionals
+```
+
+### Key patterns
+
+- **Config discovery**: Checks `.agentbox.yaml` in cwd, then `~/.config/agentbox/config.yaml`
+- **Toolsets**: Dockerfile is generated from `templates/Dockerfile.j2` with conditional sections per toolset
+- **Container runtime**: Abstracts Podman/Docker differences in `container.py`
+- **Credential mounting**: Read-only mounts for cloud CLI credentials based on config
+
+### Adding a new toolset
+
+1. Add conditional block in `src/agentbox/templates/Dockerfile.j2`
+2. Document in README.md configuration section
+
+### Adding a new agent
+
+1. Create `src/agentbox/agents/newagent.py` implementing `Agent` ABC
+2. Register in `src/agentbox/agents/__init__.py` `_AGENTS` dict
