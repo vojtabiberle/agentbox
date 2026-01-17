@@ -7,7 +7,7 @@ name = "agentbox"
 version = "0.1.0"
 description = "Run AI coding agents in isolated containers"
 readme = "README.md"
-license = "BSL-1.1"
+license = {file = "LICENSE"}
 requires-python = ">=3.10"
 authors = [
     { name = "Vojta Biberle" }
@@ -17,7 +17,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
