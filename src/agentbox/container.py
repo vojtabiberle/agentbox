@@ -1,12 +1,18 @@
 """Container runtime abstraction for Podman and Docker."""
 
+from __future__ import annotations
+
 import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .config import Config
 from .exceptions import RuntimeNotFoundError
+
+if TYPE_CHECKING:
+    from .plugins import PluginManager
 
 
 class ContainerRuntime:
@@ -54,6 +60,7 @@ class ContainerRuntime:
         ro_mounts: list[Path],
         command: list[str],
         config: Config,
+        plugin_manager: PluginManager | None = None,
     ) -> None:
         """Run a container interactively."""
         # Use host's home path for consistent identity
@@ -107,7 +114,13 @@ class ContainerRuntime:
         # Add Claude config mount
         self._add_claude_mounts(cmd, config)
 
-        # Add credential mounts
+        # Add plugin mounts and environment (new system)
+        if plugin_manager is not None:
+            self._add_plugin_mounts(cmd, plugin_manager)
+            self._add_plugin_environment(cmd, plugin_manager)
+
+        # Add credential mounts (backward compatibility)
+        # This handles credentials: config section
         self._add_credential_mounts(cmd, config)
 
         # Add image and command
@@ -130,11 +143,68 @@ class ContainerRuntime:
                 return f":{mode}"
             return ""
 
+    def _add_plugin_mounts(
+        self, cmd: list[str], plugin_manager: PluginManager
+    ) -> None:
+        """Add mounts from loaded plugins."""
+        host_home = Path.home()
+
+        for mount in plugin_manager.get_all_mounts():
+            # Expand ~ in source path
+            source = Path(mount.source).expanduser()
+
+            # Only mount if source exists
+            if not source.exists():
+                continue
+
+            # Expand ~ in target path (replace with actual home)
+            target = mount.target
+            if target.startswith("~"):
+                target = str(host_home) + target[1:]
+            elif "/home/user" in target:
+                # Also handle /home/user placeholder
+                target = target.replace("/home/user", str(host_home))
+
+            # Add mount
+            mode = "ro" if mount.readonly else "rw"
+            cmd.extend(["-v", f"{source}:{target}{self._vol_suffix(mode)}"])
+
+    def _add_plugin_environment(
+        self, cmd: list[str], plugin_manager: PluginManager
+    ) -> None:
+        """Add environment variables from loaded plugins."""
+        host_home = Path.home()
+
+        for key, value in plugin_manager.get_all_environment().items():
+            # Expand /home/user placeholder in values
+            if "/home/user" in value:
+                value = value.replace("/home/user", str(host_home))
+            cmd.extend(["-e", f"{key}={value}"])
+
     def _add_credential_mounts(self, cmd: list[str], config: Config) -> None:
-        """Add credential directory mounts based on config."""
+        """Add credential directory mounts based on config.
+
+        This method provides backward compatibility with the credentials:
+        config section. Consider using toolsets like cloud-aws, cloud-azure,
+        cloud-gcloud instead.
+        """
         creds = config.credentials
         host_home = Path.home()
         ro = self._vol_suffix("ro")
+
+        # Track if any credential mounts are enabled for deprecation warning
+        has_cloud_creds = any([creds.azure, creds.aws, creds.gcloud])
+
+        if has_cloud_creds:
+            # Print deprecation warning to stderr (not stdout to avoid interfering with output)
+            print(
+                "Warning: The 'credentials:' config section is deprecated for "
+                "cloud credentials. Consider using toolsets instead:\n"
+                "  credentials: {aws: true} -> toolsets: [cloud-aws]\n"
+                "  credentials: {azure: true} -> toolsets: [cloud-azure]\n"
+                "  credentials: {gcloud: true} -> toolsets: [cloud-gcloud]",
+                file=sys.stderr,
+            )
 
         if creds.github:
             gh_config = host_home / ".config" / "gh"

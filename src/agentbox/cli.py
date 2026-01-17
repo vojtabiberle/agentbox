@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.table import Table
 
 from . import __version__
 from .agents import get_agent
@@ -12,6 +13,7 @@ from .config import Config, load_config
 from .container import ContainerRuntime
 from .exceptions import AgentboxError
 from .image import ImageBuilder
+from .plugins import PluginManager
 
 console = Console(stderr=True)
 
@@ -68,8 +70,8 @@ def run(
     # Initialize container runtime
     runtime = ContainerRuntime(config.runtime)
 
-    # Build image if needed
-    builder = ImageBuilder(runtime, config)
+    # Build image if needed (with workspace for plugin discovery)
+    builder = ImageBuilder(runtime, config, workspace=workspace_path)
     image_name = builder.ensure_image(force_rebuild=rebuild)
 
     # Get agent configuration
@@ -93,6 +95,7 @@ def run(
         ro_mounts=ro_mounts,
         command=cmd,
         config=config,
+        plugin_manager=builder.plugin_manager,
     )
 
 
@@ -129,10 +132,11 @@ def show_config(ctx: click.Context) -> None:
 
     console.print()
     console.print("[cyan]Credentials:[/cyan]")
-    console.print(f"  github:  {cfg.credentials.github}")
-    console.print(f"  azure:   {cfg.credentials.azure}")
-    console.print(f"  aws:     {cfg.credentials.aws}")
-    console.print(f"  gcloud:  {cfg.credentials.gcloud}")
+    console.print(f"  github:     {cfg.credentials.github}")
+    console.print(f"  azure:      {cfg.credentials.azure}")
+    console.print(f"  aws:        {cfg.credentials.aws}")
+    console.print(f"  gcloud:     {cfg.credentials.gcloud}")
+    console.print(f"  ssh_agent:  {cfg.credentials.ssh_agent}")
 
     if cfg.claude.global_claude_md or cfg.claude.plugins_dir:
         console.print()
@@ -141,6 +145,58 @@ def show_config(ctx: click.Context) -> None:
             console.print(f"  global_claude_md: {cfg.claude.global_claude_md}")
         if cfg.claude.plugins_dir:
             console.print(f"  plugins_dir:      {cfg.claude.plugins_dir}")
+
+
+@main.command()
+@click.option(
+    "--workspace",
+    "-w",
+    type=click.Path(exists=True),
+    help="Workspace path to include project-level plugins",
+)
+def toolsets(workspace: str | None) -> None:
+    """List available toolsets/plugins."""
+    workspace_path = Path(workspace).resolve() if workspace else None
+    plugin_manager = PluginManager(workspace_path)
+
+    plugins = plugin_manager.list_available()
+
+    if not plugins:
+        console.print("[yellow]No toolsets found.[/yellow]")
+        return
+
+    # Create table
+    table = Table(title="Available Toolsets")
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Description")
+    table.add_column("Origin", style="dim")
+    table.add_column("Priority", justify="right", style="dim")
+
+    # Sort by priority, then name
+    plugins_sorted = sorted(plugins, key=lambda p: (p.manifest.priority, p.manifest.name))
+
+    for plugin in plugins_sorted:
+        deps = ""
+        if plugin.manifest.depends_on:
+            deps = f" (requires: {', '.join(plugin.manifest.depends_on)})"
+
+        table.add_row(
+            plugin.manifest.name,
+            plugin.manifest.description + deps,
+            plugin.origin,
+            str(plugin.manifest.priority),
+        )
+
+    console.print(table)
+
+    console.print()
+    console.print("[dim]Plugin discovery paths:[/dim]")
+    console.print("[dim]  1. Built-in: src/agentbox/plugins/builtin/[/dim]")
+    console.print("[dim]  2. User:     ~/.config/agentbox/plugins/[/dim]")
+    if workspace_path:
+        console.print(f"[dim]  3. Project:  {workspace_path}/.agentbox/plugins/[/dim]")
+    else:
+        console.print("[dim]  3. Project:  (use --workspace to include)[/dim]")
 
 
 def _print_banner(

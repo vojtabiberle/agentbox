@@ -1,0 +1,17 @@
+name: php
+description: PHP development environment with Composer
+depends_on:
+  - base
+priority: 50
+
+dockerfile: |
+  # PHP development
+  RUN dnf install -y \
+      php php-cli php-devel php-common \
+      php-mbstring php-xml php-pdo \
+      php-mysqlnd php-pgsql \
+      php-curl php-gd php-intl \
+      php-bcmath php-zip php-opcache \
+      php-sodium php-fpm \
+      composer \
+      && dnf clean all

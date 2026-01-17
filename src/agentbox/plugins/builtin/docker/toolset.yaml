@@ -1,0 +1,9 @@
+name: docker
+description: Docker CLI for interacting with host Docker socket
+depends_on:
+  - base
+priority: 90
+
+dockerfile: |
+  # Docker CLI (for interacting with host docker socket if mounted)
+  RUN dnf install -y docker-cli && dnf clean all

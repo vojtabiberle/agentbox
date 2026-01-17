@@ -1,0 +1,21 @@
+name: base
+description: Base development tools, Node.js, and Claude Code CLI
+priority: 10
+
+dockerfile: |
+  # Base development tools
+  RUN dnf install -y \
+      git git-lfs \
+      tmux htop vim \
+      ripgrep fd-find bat fzf \
+      jq yq \
+      openssh-clients \
+      keychain \
+      gh \
+      && dnf clean all
+
+  # Node.js (required for Claude Code)
+  RUN dnf install -y nodejs npm && dnf clean all
+
+  # Claude Code
+  RUN npm install -g @anthropic-ai/claude-code

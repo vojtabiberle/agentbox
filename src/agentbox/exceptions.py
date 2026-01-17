@@ -39,3 +39,42 @@ class UnknownAgentError(AgentboxError):
         self.name = name
         self.available = available
         super().__init__(f"Unknown agent: '{name}'. Available agents: {', '.join(available)}")
+
+
+# Plugin exceptions
+
+
+class PluginError(AgentboxError):
+    """Base exception for plugin-related errors."""
+
+    pass
+
+
+class PluginNotFoundError(PluginError):
+    """Requested plugin/toolset not found."""
+
+    def __init__(self, name: str, available: list[str]) -> None:
+        self.name = name
+        self.available = available
+        available_str = ", ".join(sorted(available)) if available else "(none)"
+        super().__init__(
+            f"Toolset '{name}' not found.\n"
+            f"Available toolsets: {available_str}"
+        )
+
+
+class PluginValidationError(PluginError):
+    """Plugin manifest validation failed."""
+
+    pass
+
+
+class PluginDependencyError(PluginError):
+    """Plugin dependency resolution failed."""
+
+    def __init__(self, plugin: str, missing_dep: str) -> None:
+        self.plugin = plugin
+        self.missing_dep = missing_dep
+        super().__init__(
+            f"Toolset '{plugin}' depends on '{missing_dep}', which is not available."
+        )
