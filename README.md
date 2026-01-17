@@ -1,10 +1,24 @@
 # agentbox
 
+![License](https://img.shields.io/badge/license-BSL_1.1-blue)
+
 Run AI coding agents in isolated containers with access only to your workspace.
 
 ## Why?
 
 Claude Code with `--dangerously-skip-permissions` is powerful but risky on your main system. agentbox sandboxes the agent in a container where it can only access the workspace you specify — everything else on your system is isolated.
+
+## Licensing
+
+AgentBox is licensed under the [Business Source License 1.1](LICENSE) (BSL).
+
+You are free to use this software for non-commercial purposes such as local development, personal automation, evaluation, and internal tooling.
+
+Commercial usage (including SaaS offerings, resale, or monetized redistribution) requires a separate commercial license.
+
+Starting from **2029-01-01** this project will automatically transition to **Apache License 2.0**.
+
+For commercial licensing inquiries, contact the repository owner.
 
 ## Prerequisites
 
@@ -251,6 +265,6 @@ agentbox/
 └── install.sh          # curl installer script
 ```
 
-## License
+## Trademark
 
-MIT
+AgentBox™ is a trademark of Vojta Biberle. Forks and derived works must use a different name and branding.
