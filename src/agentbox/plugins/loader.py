@@ -31,17 +31,13 @@ def load_plugin(plugin_path: Path, origin: str) -> LoadedPlugin:
         manifest_file = plugin_path / "toolset.yml"
 
     if not manifest_file.exists():
-        raise PluginValidationError(
-            f"Plugin directory '{plugin_path}' missing toolset.yaml"
-        )
+        raise PluginValidationError(f"Plugin directory '{plugin_path}' missing toolset.yaml")
 
     try:
         with open(manifest_file) as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError as e:
-        raise PluginValidationError(
-            f"Invalid YAML in '{manifest_file}': {e}"
-        ) from e
+        raise PluginValidationError(f"Invalid YAML in '{manifest_file}': {e}") from e
 
     if data is None:
         raise PluginValidationError(f"Empty manifest file: {manifest_file}")
@@ -49,9 +45,7 @@ def load_plugin(plugin_path: Path, origin: str) -> LoadedPlugin:
     try:
         manifest = ToolsetManifest.model_validate(data)
     except ValidationError as e:
-        raise PluginValidationError(
-            f"Invalid manifest in '{manifest_file}': {e}"
-        ) from e
+        raise PluginValidationError(f"Invalid manifest in '{manifest_file}': {e}") from e
 
     return LoadedPlugin(
         manifest=manifest,
@@ -68,9 +62,7 @@ class PluginDiscoveryResult:
         self.errors: dict[str, PluginValidationError] = {}
 
 
-def load_plugins_from_directory(
-    plugins_dir: Path, origin: str
-) -> PluginDiscoveryResult:
+def load_plugins_from_directory(plugins_dir: Path, origin: str) -> PluginDiscoveryResult:
     """Load all plugins from a directory.
 
     Args:

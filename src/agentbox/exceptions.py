@@ -57,10 +57,7 @@ class PluginNotFoundError(PluginError):
         self.name = name
         self.available = available
         available_str = ", ".join(sorted(available)) if available else "(none)"
-        super().__init__(
-            f"Toolset '{name}' not found.\n"
-            f"Available toolsets: {available_str}"
-        )
+        super().__init__(f"Toolset '{name}' not found.\nAvailable toolsets: {available_str}")
 
 
 class PluginValidationError(PluginError):
@@ -75,6 +72,4 @@ class PluginDependencyError(PluginError):
     def __init__(self, plugin: str, missing_dep: str) -> None:
         self.plugin = plugin
         self.missing_dep = missing_dep
-        super().__init__(
-            f"Toolset '{plugin}' depends on '{missing_dep}', which is not available."
-        )
+        super().__init__(f"Toolset '{plugin}' depends on '{missing_dep}', which is not available.")

@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python -m pytest -v)",
-      "Bash(source .venv/bin/activate)"
-    ]
-  }
-}

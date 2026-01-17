@@ -143,9 +143,7 @@ class ContainerRuntime:
                 return f":{mode}"
             return ""
 
-    def _add_plugin_mounts(
-        self, cmd: list[str], plugin_manager: PluginManager
-    ) -> None:
+    def _add_plugin_mounts(self, cmd: list[str], plugin_manager: PluginManager) -> None:
         """Add mounts from loaded plugins."""
         host_home = Path.home()
 
@@ -169,9 +167,7 @@ class ContainerRuntime:
             mode = "ro" if mount.readonly else "rw"
             cmd.extend(["-v", f"{source}:{target}{self._vol_suffix(mode)}"])
 
-    def _add_plugin_environment(
-        self, cmd: list[str], plugin_manager: PluginManager
-    ) -> None:
+    def _add_plugin_environment(self, cmd: list[str], plugin_manager: PluginManager) -> None:
         """Add environment variables from loaded plugins."""
         host_home = Path.home()
 
