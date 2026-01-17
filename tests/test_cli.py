@@ -1,0 +1,314 @@
+"""Tests for CLI commands."""
+
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+from click.testing import CliRunner
+
+from agentbox.cli import main, cli
+from agentbox.exceptions import AgentboxError, RuntimeNotFoundError
+
+
+@pytest.fixture
+def runner() -> CliRunner:
+    """Create a CLI runner."""
+    return CliRunner()
+
+
+@pytest.fixture
+def mock_runtime() -> MagicMock:
+    """Create a mock container runtime."""
+    with patch("agentbox.cli.ContainerRuntime") as mock:
+        instance = MagicMock()
+        mock.return_value = instance
+        yield instance
+
+
+@pytest.fixture
+def mock_builder() -> MagicMock:
+    """Create a mock image builder."""
+    with patch("agentbox.cli.ImageBuilder") as mock:
+        instance = MagicMock()
+        instance.ensure_image.return_value = "agentbox:latest"
+        mock.return_value = instance
+        yield instance
+
+
+class TestRunCommand:
+    """Tests for the run command."""
+
+    def test_run_with_default_workspace(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run command uses current directory as default workspace."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run"])
+
+            # Should have called run with current directory
+            mock_runtime.run.assert_called_once()
+            call_kwargs = mock_runtime.run.call_args
+            assert call_kwargs[1]["workspace"] == tmp_path
+
+    def test_run_creates_missing_workspace_on_confirm(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run command creates workspace directory when user confirms."""
+        monkeypatch.chdir(tmp_path)
+        new_workspace = tmp_path / "new-workspace"
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run", str(new_workspace)], input="y\n")
+
+            assert new_workspace.exists()
+
+    def test_run_aborts_on_missing_workspace_declined(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run command aborts when user declines to create workspace."""
+        monkeypatch.chdir(tmp_path)
+        new_workspace = tmp_path / "new-workspace"
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder"):
+            result = runner.invoke(main, ["run", str(new_workspace)], input="n\n")
+
+            assert result.exit_code == 1
+            assert not new_workspace.exists()
+
+    def test_run_bash_mode(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run with --bash flag uses bash command."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run", "--bash"])
+
+            mock_runtime.run.assert_called_once()
+            call_kwargs = mock_runtime.run.call_args
+            assert call_kwargs[1]["command"] == ["bash"]
+
+    def test_run_with_read_only_mounts(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run with -r flag adds read-only mounts."""
+        monkeypatch.chdir(tmp_path)
+
+        ro_dir = tmp_path / "readonly"
+        ro_dir.mkdir()
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run", "-r", str(ro_dir)])
+
+            mock_runtime.run.assert_called_once()
+            call_kwargs = mock_runtime.run.call_args
+            assert ro_dir in call_kwargs[1]["ro_mounts"]
+
+    def test_run_with_rebuild_flag(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run with --rebuild forces image rebuild."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run", "--rebuild"])
+
+            mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
+
+
+class TestBuildCommand:
+    """Tests for the build command."""
+
+    def test_build_without_rebuild(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Build command without --rebuild flag."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["build"])
+
+            mock_builder.ensure_image.assert_called_once_with(force_rebuild=False)
+            assert result.exit_code == 0
+
+    def test_build_with_rebuild(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Build command with --rebuild flag."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["build", "--rebuild"])
+
+            mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
+
+
+class TestConfigCommand:
+    """Tests for the config command."""
+
+    def test_config_shows_defaults(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config command shows default values when no config file."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        result = runner.invoke(main, ["config"])
+
+        assert result.exit_code == 0
+        assert "podman" in result.output
+        assert "agentbox" in result.output
+
+    def test_config_shows_config_file_path(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config command shows config file path when present."""
+        monkeypatch.chdir(tmp_path)
+
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("runtime: docker\n")
+
+        result = runner.invoke(main, ["config"])
+
+        assert result.exit_code == 0
+        assert str(config_file) in result.output
+
+
+class TestErrorHandling:
+    """Tests for CLI error handling."""
+
+    def test_runtime_not_found_error(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """RuntimeNotFoundError propagates from ContainerRuntime."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_cls:
+            mock_cls.side_effect = RuntimeNotFoundError("podman")
+
+            result = runner.invoke(main, ["run"])
+
+            # Exception should be raised (not caught by CliRunner by default)
+            assert result.exception is not None
+            assert isinstance(result.exception, RuntimeNotFoundError)
+
+    def test_unknown_agent_error(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Unknown agent shows friendly error."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            result = runner.invoke(main, ["run", "--agent", "nonexistent"])
+
+            assert result.exit_code != 0
+            assert result.exception is not None
+
+
+class TestMainHelp:
+    """Tests for main command help."""
+
+    def test_main_without_subcommand_shows_help(self, runner: CliRunner) -> None:
+        """Main command without subcommand shows help."""
+        result = runner.invoke(main)
+
+        assert result.exit_code == 0
+        assert "run" in result.output
+        assert "build" in result.output
+        assert "config" in result.output
+
+    def test_version_option(self, runner: CliRunner) -> None:
+        """--version shows version."""
+        result = runner.invoke(main, ["--version"])
+
+        assert result.exit_code == 0
+        assert "agentbox" in result.output.lower()

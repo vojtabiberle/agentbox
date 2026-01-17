@@ -24,10 +24,10 @@ class ContainerRuntime:
                 capture_output=True,
                 check=True,
             )
-        except FileNotFoundError:
-            raise RuntimeNotFoundError(self.runtime)
-        except subprocess.CalledProcessError:
-            raise RuntimeNotFoundError(self.runtime)
+        except FileNotFoundError as err:
+            raise RuntimeNotFoundError(self.runtime) from err
+        except subprocess.CalledProcessError as err:
+            raise RuntimeNotFoundError(self.runtime) from err
 
     def image_exists(self, name: str) -> bool:
         """Check if a container image exists."""
@@ -61,13 +61,21 @@ class ContainerRuntime:
 
         # Build command
         cmd = [
-            self.runtime, "run", "-it", "--rm",
-            "-v", f"{workspace}:/workspace{self._vol_suffix()}",
-            "-w", "/workspace",
+            self.runtime,
+            "run",
+            "-it",
+            "--rm",
+            "-v",
+            f"{workspace}:/workspace{self._vol_suffix()}",
+            "-w",
+            "/workspace",
             "--uts=host",  # Share UTS namespace (hostname) with host
-            "-e", f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-            "-e", f"HOME={host_home}",
-            "-e", f"PATH=/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
+            "-e",
+            f"TERM={os.environ.get('TERM', 'xterm-256color')}",
+            "-e",
+            f"HOME={host_home}",
+            "-e",
+            f"PATH=/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
         ]
 
         # Mount host machine-id for consistent identity (needed for Claude statsig cache)
@@ -77,15 +85,20 @@ class ContainerRuntime:
 
         # Add runtime-specific options for rootless operation
         if self.runtime == "podman":
-            cmd.extend([
-                "--userns=keep-id",
-                "--security-opt=no-new-privileges",
-            ])
+            cmd.extend(
+                [
+                    "--userns=keep-id",
+                    "--security-opt=no-new-privileges",
+                ]
+            )
         elif self.runtime == "docker":
             # Docker: run as current user to avoid root
-            cmd.extend([
-                "--user", f"{os.getuid()}:{os.getgid()}",
-            ])
+            cmd.extend(
+                [
+                    "--user",
+                    f"{os.getuid()}:{os.getgid()}",
+                ]
+            )
 
         # Add read-only mounts
         for i, ro_path in enumerate(ro_mounts):
@@ -168,11 +181,9 @@ class ContainerRuntime:
         claude_config = config.claude
 
         if claude_config.global_claude_md and claude_config.global_claude_md.exists():
-            cmd.extend([
-                "-v", f"{claude_config.global_claude_md}:{host_home}/.claude/CLAUDE.md{ro}"
-            ])
+            cmd.extend(
+                ["-v", f"{claude_config.global_claude_md}:{host_home}/.claude/CLAUDE.md{ro}"]
+            )
 
         if claude_config.plugins_dir and claude_config.plugins_dir.exists():
-            cmd.extend([
-                "-v", f"{claude_config.plugins_dir}:{host_home}/.claude/plugins{ro}"
-            ])
+            cmd.extend(["-v", f"{claude_config.plugins_dir}:{host_home}/.claude/plugins{ro}"])

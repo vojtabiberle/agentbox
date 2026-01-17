@@ -52,7 +52,7 @@ class ImageBuilder:
         self.runtime.build(dockerfile, image_name)
 
         console.print()
-        console.print(f"[green]Image built successfully.[/green]")
+        console.print("[green]Image built successfully.[/green]")
 
         return image_name
 

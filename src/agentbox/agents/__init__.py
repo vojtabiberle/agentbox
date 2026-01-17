@@ -1,9 +1,8 @@
 """Agent implementations."""
 
+from ..exceptions import UnknownAgentError
 from .base import Agent
 from .claude import ClaudeAgent
-from ..exceptions import UnknownAgentError
-
 
 _AGENTS: dict[str, type[Agent]] = {
     "claude": ClaudeAgent,

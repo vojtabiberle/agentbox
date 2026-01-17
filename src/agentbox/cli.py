@@ -34,8 +34,13 @@ def main(ctx: click.Context) -> None:
 @click.argument("workspace", type=click.Path(), default=".")
 @click.option("--bash", is_flag=True, help="Run bash instead of agent (for debugging)")
 @click.option("--agent", "-a", default="claude", help="Agent to run (default: claude)")
-@click.option("--ro", "-r", multiple=True, type=click.Path(exists=True),
-              help="Read-only directory to mount (can be used multiple times)")
+@click.option(
+    "--ro",
+    "-r",
+    multiple=True,
+    type=click.Path(exists=True),
+    help="Read-only directory to mount (can be used multiple times)",
+)
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
 @click.pass_context
 def run(
@@ -115,7 +120,7 @@ def show_config(ctx: click.Context) -> None:
         console.print(f"[cyan]Config file:[/cyan] {config_path}")
     else:
         console.print("[yellow]Config file:[/yellow] None (using defaults)")
-        console.print(f"[dim]  Create config at: ~/.config/agentbox/config.yaml[/dim]")
+        console.print("[dim]  Create config at: ~/.config/agentbox/config.yaml[/dim]")
 
     console.print()
     console.print(f"[cyan]Runtime:[/cyan]    {cfg.runtime}")

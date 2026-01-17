@@ -38,6 +38,4 @@ class UnknownAgentError(AgentboxError):
     def __init__(self, name: str, available: list[str]) -> None:
         self.name = name
         self.available = available
-        super().__init__(
-            f"Unknown agent: '{name}'. Available agents: {', '.join(available)}"
-        )
+        super().__init__(f"Unknown agent: '{name}'. Available agents: {', '.join(available)}")
