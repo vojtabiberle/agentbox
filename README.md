@@ -131,10 +131,11 @@ toolsets:
 
 # Share credentials with the container (read-only)
 credentials:
-  github: true   # ~/.config/gh
-  azure: true    # ~/.azure
-  aws: false     # ~/.aws
-  gcloud: false  # ~/.config/gcloud
+  github: true    # ~/.config/gh
+  azure: true     # ~/.azure
+  aws: false      # ~/.aws
+  gcloud: false   # ~/.config/gcloud
+  ssh_agent: true # Forward SSH agent (SSH_AUTH_SOCK)
 
 # Claude-specific settings
 claude:
@@ -152,7 +153,6 @@ claude:
 ## Limitations
 
 - No access to host Docker/Podman socket (can't run containers inside)
-- No SSH agent forwarding (yet)
 - No GPU access
 - Container is ephemeral — installed packages are lost between runs (workspace files persist)
 
