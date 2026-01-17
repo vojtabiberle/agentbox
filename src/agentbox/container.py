@@ -26,13 +26,17 @@ class ContainerRuntime:
             )
         except FileNotFoundError:
             raise RuntimeNotFoundError(self.runtime)
+        except subprocess.CalledProcessError:
+            raise RuntimeNotFoundError(self.runtime)
 
     def image_exists(self, name: str) -> bool:
         """Check if a container image exists."""
-        result = subprocess.run(
-            [self.runtime, "image", "exists", name],
-            capture_output=True,
-        )
+        # Podman has `image exists`, Docker uses `image inspect`
+        if self.runtime == "podman":
+            cmd = [self.runtime, "image", "exists", name]
+        else:
+            cmd = [self.runtime, "image", "inspect", name]
+        result = subprocess.run(cmd, capture_output=True)
         return result.returncode == 0
 
     def build(self, dockerfile_content: str, tag: str) -> None:
@@ -138,6 +142,12 @@ class ContainerRuntime:
             gcloud_dir = host_home / ".config" / "gcloud"
             if gcloud_dir.exists():
                 cmd.extend(["-v", f"{gcloud_dir}:{host_home}/.config/gcloud{ro}"])
+
+        if creds.ssh_agent:
+            ssh_sock = os.environ.get("SSH_AUTH_SOCK")
+            if ssh_sock and Path(ssh_sock).exists():
+                cmd.extend(["-v", f"{ssh_sock}:{ssh_sock}"])
+                cmd.extend(["-e", f"SSH_AUTH_SOCK={ssh_sock}"])
 
     def _add_claude_mounts(self, cmd: list[str], config: Config) -> None:
         """Add Claude config mounts."""

@@ -2,6 +2,7 @@
 
 from .base import Agent
 from .claude import ClaudeAgent
+from ..exceptions import UnknownAgentError
 
 
 _AGENTS: dict[str, type[Agent]] = {
@@ -12,8 +13,7 @@ _AGENTS: dict[str, type[Agent]] = {
 def get_agent(name: str) -> Agent:
     """Get an agent instance by name."""
     if name not in _AGENTS:
-        available = ", ".join(_AGENTS.keys())
-        raise ValueError(f"Unknown agent: {name}. Available: {available}")
+        raise UnknownAgentError(name, list(_AGENTS.keys()))
 
     return _AGENTS[name]()
 

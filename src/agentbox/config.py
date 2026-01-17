@@ -88,7 +88,7 @@ credentials:
   azure: false     # ~/.azure
   aws: false       # ~/.aws
   gcloud: false    # ~/.config/gcloud
-  ssh_agent: false # SSH_AUTH_SOCK (not yet implemented)
+  ssh_agent: false # SSH_AUTH_SOCK forwarding
 
 # Claude-specific settings
 claude:
