@@ -240,6 +240,59 @@ def config_init(is_global: bool, is_project: bool, force: bool) -> None:
 
 
 @main.command()
+def upgrade() -> None:
+    """Upgrade agentbox to the latest version."""
+    import subprocess
+
+    # Check if running from ~/.agentbox/venv (installed via install.sh)
+    venv_path = Path.home() / ".agentbox" / "venv"
+    current_executable = Path(sys.executable).resolve()
+
+    if venv_path in current_executable.parents or current_executable.parent.parent == venv_path:
+        console.print("[cyan]Upgrading agentbox...[/cyan]")
+        pip_path = venv_path / "bin" / "pip"
+
+        try:
+            result = subprocess.run(
+                [
+                    str(pip_path),
+                    "install",
+                    "--force-reinstall",
+                    "--quiet",
+                    "git+https://github.com/vojtabiberle/agentbox.git",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                console.print("[green]✓[/green] agentbox upgraded successfully!")
+                console.print("[dim]  Restart your shell or run 'hash -r' to use new version[/dim]")
+            else:
+                console.print("[red]Error upgrading agentbox:[/red]")
+                if result.stdout:
+                    console.print(result.stdout)
+                if result.stderr:
+                    console.print(result.stderr)
+                raise SystemExit(1)
+        except FileNotFoundError:
+            console.print("[red]Error:[/red] pip not found in venv")
+            raise SystemExit(1) from None
+    else:
+        # System installation (package manager, pipx, etc.)
+        console.print("[yellow]agentbox is not installed via install.sh[/yellow]")
+        console.print()
+        console.print("To upgrade, use your package manager or installation method:")
+        console.print("  [dim]# If installed with pipx:[/dim]")
+        console.print("  pipx upgrade agentbox")
+        console.print()
+        console.print("  [dim]# If installed with pip:[/dim]")
+        console.print("  pip install --upgrade git+https://github.com/vojtabiberle/agentbox.git")
+        console.print()
+        console.print("  [dim]# If installed via system package manager:[/dim]")
+        console.print("  Check your distribution's package manager")
+
+
+@main.command()
 @click.option(
     "--workspace",
     "-w",
