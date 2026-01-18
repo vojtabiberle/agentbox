@@ -8,10 +8,12 @@ from pydantic import ValidationError
 
 from agentbox.config import (
     Config,
-    load_config,
     get_config_paths,
-    get_default_config_path,
-    save_default_config,
+    get_global_config_path,
+    get_project_config_path,
+    load_config,
+    save_global_config,
+    save_project_config,
 )
 
 
@@ -81,10 +83,16 @@ class TestConfigPaths:
         assert any(".agentbox.yml" in p for p in path_strs)
         assert any(".config/agentbox/config.yaml" in p for p in path_strs)
 
-    def test_get_default_config_path(self) -> None:
-        """Default config path is in ~/.config/agentbox/."""
-        path = get_default_config_path()
+    def test_get_global_config_path(self) -> None:
+        """Global config path is in ~/.config/agentbox/."""
+        path = get_global_config_path()
         assert ".config/agentbox/config.yaml" in str(path)
+
+    def test_get_project_config_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Project config path is .agentbox.yaml in cwd."""
+        monkeypatch.chdir(tmp_path)
+        path = get_project_config_path()
+        assert path == tmp_path / ".agentbox.yaml"
 
 
 class TestLoadConfig:
@@ -145,45 +153,72 @@ class TestLoadConfig:
         assert config_path == config_file
 
 
-class TestSaveDefaultConfig:
-    """Tests for save_default_config function."""
+class TestSaveGlobalConfig:
+    """Tests for save_global_config function."""
 
-    def test_save_default_config_creates_file(
+    def test_save_global_config_creates_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """save_default_config creates config file."""
+        """save_global_config creates config file."""
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-        path = save_default_config()
+        path = save_global_config()
 
         assert path.exists()
         assert "config.yaml" in str(path)
 
-    def test_save_default_config_creates_parent_dirs(
+    def test_save_global_config_creates_parent_dirs(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """save_default_config creates parent directories."""
+        """save_global_config creates parent directories."""
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         config_dir = tmp_path / ".config" / "agentbox"
         assert not config_dir.exists()
 
-        save_default_config()
+        save_global_config()
 
         assert config_dir.exists()
 
-    def test_save_default_config_content(
+    def test_save_global_config_content(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """save_default_config writes valid YAML content."""
+        """save_global_config writes valid YAML content."""
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-        path = save_default_config()
+        path = save_global_config()
         content = path.read_text()
 
         assert "runtime:" in content
         assert "toolsets:" in content
         assert "credentials:" in content
+
+
+class TestSaveProjectConfig:
+    """Tests for save_project_config function."""
+
+    def test_save_project_config_creates_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """save_project_config creates config file in cwd."""
+        monkeypatch.chdir(tmp_path)
+
+        path = save_project_config()
+
+        assert path.exists()
+        assert path == tmp_path / ".agentbox.yaml"
+
+    def test_save_project_config_content(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """save_project_config writes project-specific YAML content."""
+        monkeypatch.chdir(tmp_path)
+
+        path = save_project_config()
+        content = path.read_text()
+
+        assert "toolsets:" in content
+        assert "project configuration" in content.lower()
