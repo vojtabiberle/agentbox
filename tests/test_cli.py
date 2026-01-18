@@ -1,14 +1,13 @@
 """Tests for CLI commands."""
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from agentbox.cli import main, cli
-from agentbox.exceptions import AgentboxError, RuntimeNotFoundError
+from agentbox.cli import main
+from agentbox.exceptions import RuntimeNotFoundError
 
 
 @pytest.fixture
@@ -57,7 +56,7 @@ class TestRunCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["run"])
+            runner.invoke(main, ["run"])
 
             # Should have called run with current directory
             mock_runtime.run.assert_called_once()
@@ -80,7 +79,7 @@ class TestRunCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["run", str(new_workspace)], input="y\n")
+            runner.invoke(main, ["run", str(new_workspace)], input="y\n")
 
             assert new_workspace.exists()
 
@@ -119,7 +118,7 @@ class TestRunCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["run", "--bash"])
+            runner.invoke(main, ["run", "--bash"])
 
             mock_runtime.run.assert_called_once()
             call_kwargs = mock_runtime.run.call_args
@@ -146,7 +145,7 @@ class TestRunCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["run", "-r", str(ro_dir)])
+            runner.invoke(main, ["run", "-r", str(ro_dir)])
 
             mock_runtime.run.assert_called_once()
             call_kwargs = mock_runtime.run.call_args
@@ -167,7 +166,7 @@ class TestRunCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["run", "--rebuild"])
+            runner.invoke(main, ["run", "--rebuild"])
 
             mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
 
@@ -210,7 +209,7 @@ class TestBuildCommand:
             mock_builder.ensure_image.return_value = "agentbox"
             mock_builder_cls.return_value = mock_builder
 
-            result = runner.invoke(main, ["build", "--rebuild"])
+            runner.invoke(main, ["build", "--rebuild"])
 
             mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
 
@@ -250,6 +249,161 @@ class TestConfigCommand:
 
         assert result.exit_code == 0
         assert str(config_file) in result.output
+
+    def test_config_show_subcommand(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config show subcommand works same as config."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        result = runner.invoke(main, ["config", "show"])
+
+        assert result.exit_code == 0
+        assert "podman" in result.output
+
+    def test_config_init_creates_global_by_default(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init creates global config by default."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        result = runner.invoke(main, ["config", "init"])
+
+        assert result.exit_code == 0
+        global_config = tmp_path / ".config" / "agentbox" / "config.yaml"
+        assert global_config.exists()
+        assert "Created global config" in result.output
+
+    def test_config_init_global_flag(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init --global creates global config."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        result = runner.invoke(main, ["config", "init", "--global"])
+
+        assert result.exit_code == 0
+        global_config = tmp_path / ".config" / "agentbox" / "config.yaml"
+        assert global_config.exists()
+
+    def test_config_init_project_flag(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init --project creates project config."""
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(main, ["config", "init", "--project"])
+
+        assert result.exit_code == 0
+        project_config = tmp_path / ".agentbox.yaml"
+        assert project_config.exists()
+        assert "Created project config" in result.output
+
+    def test_config_init_does_not_overwrite_without_force(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init does not overwrite existing config without --force."""
+        monkeypatch.chdir(tmp_path)
+
+        # Create existing config
+        project_config = tmp_path / ".agentbox.yaml"
+        project_config.write_text("runtime: docker\n")
+
+        result = runner.invoke(main, ["config", "init", "--project"])
+
+        assert result.exit_code == 0
+        assert "already exists" in result.output
+        # Content should be unchanged
+        assert project_config.read_text() == "runtime: docker\n"
+
+    def test_config_init_force_overwrites(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init --force overwrites existing config."""
+        monkeypatch.chdir(tmp_path)
+
+        # Create existing config
+        project_config = tmp_path / ".agentbox.yaml"
+        project_config.write_text("runtime: docker\n")
+
+        result = runner.invoke(main, ["config", "init", "--project", "--force"])
+
+        assert result.exit_code == 0
+        assert "Created project config" in result.output
+        # Content should be new default
+        assert "runtime: docker\n" not in project_config.read_text()
+
+
+class TestToolsetCommand:
+    """Tests for the toolset command."""
+
+    def test_toolset_shows_details(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Toolset command shows toolset details."""
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(main, ["toolset", "base"])
+
+        assert result.exit_code == 0
+        assert "base" in result.output
+        assert "Origin:" in result.output
+        assert "Priority:" in result.output
+
+    def test_toolset_not_found_error(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Toolset command shows error for unknown toolset."""
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(main, ["toolset", "nonexistent-toolset"])
+
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
+    def test_toolset_shows_mounts(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Toolset command shows mount information."""
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(main, ["toolset", "cloud-aws"])
+
+        assert result.exit_code == 0
+        assert "Mounts:" in result.output
+        assert "~/.aws" in result.output
 
 
 class TestErrorHandling:

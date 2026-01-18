@@ -9,9 +9,17 @@ from rich.table import Table
 
 from . import __version__
 from .agents import get_agent
-from .config import Config, load_config
+from .config import (
+    Config,
+    get_config_paths,
+    get_global_config_path,
+    get_project_config_path,
+    load_config,
+    save_global_config,
+    save_project_config,
+)
 from .container import ContainerRuntime
-from .exceptions import AgentboxError
+from .exceptions import AgentboxError, PluginError
 from .image import ImageBuilder
 from .plugins import PluginManager
 
@@ -112,9 +120,18 @@ def build(ctx: click.Context, rebuild: bool) -> None:
     console.print(f"[green]Image ready:[/green] {image_name}")
 
 
-@main.command(name="config")
+@main.group(name="config", invoke_without_command=True)
 @click.pass_context
-def show_config(ctx: click.Context) -> None:
+def config_group(ctx: click.Context) -> None:
+    """Manage configuration."""
+    if ctx.invoked_subcommand is None:
+        # Default behavior: show config
+        ctx.invoke(config_show)
+
+
+@config_group.command(name="show")
+@click.pass_context
+def config_show(ctx: click.Context) -> None:
     """Show current configuration."""
     cfg: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
@@ -123,12 +140,58 @@ def show_config(ctx: click.Context) -> None:
         console.print(f"[cyan]Config file:[/cyan] {config_path}")
     else:
         console.print("[yellow]Config file:[/yellow] None (using defaults)")
-        console.print("[dim]  Create config at: ~/.config/agentbox/config.yaml[/dim]")
+        console.print("[dim]  Run 'agentbox config init' to create one[/dim]")
+
+    console.print()
+    console.print("[cyan]Config paths (priority order):[/cyan]")
+    for i, path in enumerate(get_config_paths(), 1):
+        console.print(f"  [dim]{i}.[/dim] {path}")
 
     console.print()
     console.print(f"[cyan]Runtime:[/cyan]    {cfg.runtime}")
     console.print(f"[cyan]Image:[/cyan]      {cfg.image_name}")
-    console.print(f"[cyan]Toolsets:[/cyan]   {', '.join(cfg.toolsets)}")
+
+    # Get all available toolsets (include cwd for project plugin discovery)
+    plugin_manager = PluginManager(Path.cwd())
+    available_plugins = {p.manifest.name for p in plugin_manager.list_available()}
+    enabled_toolsets = set(cfg.toolsets)
+
+    console.print()
+    console.print("[cyan]Toolsets:[/cyan]")
+    for toolset in cfg.toolsets:
+        if toolset in available_plugins:
+            console.print(f"  [green]✓[/green] {toolset}")
+        else:
+            console.print(f"  [red]✗[/red] {toolset} [red](not found)[/red]")
+
+    # Show available but inactive toolsets
+    inactive = available_plugins - enabled_toolsets
+    if inactive:
+        console.print()
+        console.print("[cyan]Available (inactive):[/cyan]")
+        for toolset in sorted(inactive):
+            console.print(f"  [dim]-[/dim] {toolset}")
+
+    # Show mounts from enabled toolsets
+    try:
+        plugin_manager.load(cfg.toolsets)
+        all_mounts = plugin_manager.get_all_mounts()
+        if all_mounts:
+            console.print()
+            console.print("[cyan]Mounts:[/cyan]")
+            for mount in all_mounts:
+                # Expand ~ in source path for existence check
+                source_expanded = Path(mount.source).expanduser()
+                exists = source_expanded.exists()
+                status = "[green]✓[/green]" if exists else "[red]✗[/red]"
+                ro_flag = "[dim](ro)[/dim]" if mount.readonly else "[yellow](rw)[/yellow]"
+                console.print(f"  {status} {mount.source} → {mount.target} {ro_flag}")
+                if not exists:
+                    console.print("      [dim]path does not exist[/dim]")
+    except PluginError as e:
+        console.print()
+        console.print("[cyan]Mounts:[/cyan]")
+        console.print(f"  [yellow]⚠[/yellow] Could not load toolsets: {e}")
 
     console.print()
     console.print("[cyan]Credentials:[/cyan]")
@@ -145,6 +208,35 @@ def show_config(ctx: click.Context) -> None:
             console.print(f"  global_claude_md: {cfg.claude.global_claude_md}")
         if cfg.claude.plugins_dir:
             console.print(f"  plugins_dir:      {cfg.claude.plugins_dir}")
+
+
+@config_group.command(name="init")
+@click.option("--global", "is_global", is_flag=True, help="Create global config")
+@click.option("--project", "is_project", is_flag=True, help="Create project config")
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing config file")
+def config_init(is_global: bool, is_project: bool, force: bool) -> None:
+    """Create a new configuration file."""
+    # Default to global if neither specified
+    if not is_global and not is_project:
+        is_global = True
+
+    if is_global:
+        path = get_global_config_path()
+        if path.exists() and not force:
+            console.print(f"[yellow]Global config already exists:[/yellow] {path}")
+            console.print("[dim]  Use --force to overwrite[/dim]")
+        else:
+            save_global_config()
+            console.print(f"[green]Created global config:[/green] {path}")
+
+    if is_project:
+        path = get_project_config_path()
+        if path.exists() and not force:
+            console.print(f"[yellow]Project config already exists:[/yellow] {path}")
+            console.print("[dim]  Use --force to overwrite[/dim]")
+        else:
+            save_project_config()
+            console.print(f"[green]Created project config:[/green] {path}")
 
 
 @main.command()
@@ -197,6 +289,59 @@ def toolsets(workspace: str | None) -> None:
         console.print(f"[dim]  3. Project:  {workspace_path}/.agentbox/plugins/[/dim]")
     else:
         console.print("[dim]  3. Project:  (use --workspace to include)[/dim]")
+
+
+@main.command()
+@click.argument("name")
+@click.option(
+    "--workspace",
+    "-w",
+    type=click.Path(exists=True),
+    help="Workspace path to include project-level plugins",
+)
+def toolset(name: str, workspace: str | None) -> None:
+    """Show details of a specific toolset."""
+    workspace_path = Path(workspace).resolve() if workspace else None
+    plugin_manager = PluginManager(workspace_path)
+
+    try:
+        plugin = plugin_manager.get_plugin(name)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1) from None
+
+    manifest = plugin.manifest
+
+    console.print()
+    console.print(f"[cyan bold]{manifest.name}[/cyan bold]")
+    if manifest.description:
+        console.print(f"  {manifest.description}")
+
+    console.print()
+    console.print(f"[cyan]Origin:[/cyan]   {plugin.origin}")
+    console.print(f"[cyan]Priority:[/cyan] {manifest.priority}")
+    console.print(f"[cyan]Path:[/cyan]     {plugin.source_path}")
+
+    if manifest.depends_on:
+        console.print()
+        console.print("[cyan]Dependencies:[/cyan]")
+        for dep in manifest.depends_on:
+            console.print(f"  - {dep}")
+
+    if manifest.mounts:
+        console.print()
+        console.print("[cyan]Mounts:[/cyan]")
+        for mount in manifest.mounts:
+            ro_flag = "[dim](ro)[/dim]" if mount.readonly else "[yellow](rw)[/yellow]"
+            console.print(f"  {mount.source} → {mount.target} {ro_flag}")
+            if mount.description:
+                console.print(f"    [dim]{mount.description}[/dim]")
+
+    if manifest.environment:
+        console.print()
+        console.print("[cyan]Environment:[/cyan]")
+        for key, value in manifest.environment.items():
+            console.print(f"  {key}={value}")
 
 
 def _print_banner(
