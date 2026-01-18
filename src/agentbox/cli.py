@@ -11,6 +11,7 @@ from . import __version__
 from .agents import get_agent
 from .config import (
     Config,
+    get_config_paths,
     get_global_config_path,
     get_project_config_path,
     load_config,
@@ -18,7 +19,7 @@ from .config import (
     save_project_config,
 )
 from .container import ContainerRuntime
-from .exceptions import AgentboxError
+from .exceptions import AgentboxError, PluginError
 from .image import ImageBuilder
 from .plugins import PluginManager
 
@@ -143,15 +144,15 @@ def config_show(ctx: click.Context) -> None:
 
     console.print()
     console.print("[cyan]Config paths (priority order):[/cyan]")
-    console.print(f"  [dim]1. Project:[/dim]  {get_project_config_path()}")
-    console.print(f"  [dim]2. Global:[/dim]   {get_global_config_path()}")
+    for i, path in enumerate(get_config_paths(), 1):
+        console.print(f"  [dim]{i}.[/dim] {path}")
 
     console.print()
     console.print(f"[cyan]Runtime:[/cyan]    {cfg.runtime}")
     console.print(f"[cyan]Image:[/cyan]      {cfg.image_name}")
 
-    # Get all available toolsets
-    plugin_manager = PluginManager()
+    # Get all available toolsets (include cwd for project plugin discovery)
+    plugin_manager = PluginManager(Path.cwd())
     available_plugins = {p.manifest.name for p in plugin_manager.list_available()}
     enabled_toolsets = set(cfg.toolsets)
 
@@ -170,6 +171,27 @@ def config_show(ctx: click.Context) -> None:
         console.print("[cyan]Available (inactive):[/cyan]")
         for toolset in sorted(inactive):
             console.print(f"  [dim]-[/dim] {toolset}")
+
+    # Show mounts from enabled toolsets
+    try:
+        plugin_manager.load(cfg.toolsets)
+        all_mounts = plugin_manager.get_all_mounts()
+        if all_mounts:
+            console.print()
+            console.print("[cyan]Mounts:[/cyan]")
+            for mount in all_mounts:
+                # Expand ~ in source path for existence check
+                source_expanded = Path(mount.source).expanduser()
+                exists = source_expanded.exists()
+                status = "[green]✓[/green]" if exists else "[red]✗[/red]"
+                ro_flag = "[dim](ro)[/dim]" if mount.readonly else "[yellow](rw)[/yellow]"
+                console.print(f"  {status} {mount.source} → {mount.target} {ro_flag}")
+                if not exists:
+                    console.print("      [dim]path does not exist[/dim]")
+    except PluginError as e:
+        console.print()
+        console.print("[cyan]Mounts:[/cyan]")
+        console.print(f"  [yellow]⚠[/yellow] Could not load toolsets: {e}")
 
     console.print()
     console.print("[cyan]Credentials:[/cyan]")
