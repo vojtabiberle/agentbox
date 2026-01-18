@@ -406,6 +406,91 @@ class TestToolsetCommand:
         assert "~/.aws" in result.output
 
 
+class TestSafeCommandsWithInvalidConfig:
+    """Tests for commands that can run with invalid config."""
+
+    def test_config_command_works_with_invalid_config(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config command succeeds even with invalid config file."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create invalid config
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("claude: null\n")
+
+        result = runner.invoke(main, ["config"])
+
+        assert result.exit_code == 0
+        assert "Warning: Invalid config file" in result.output
+        assert "agentbox config init --force" in result.output
+
+    def test_config_init_works_with_invalid_config(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Config init --force can fix invalid config file."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create invalid config
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("claude: null\n")
+
+        result = runner.invoke(main, ["config", "init", "--project", "--force"])
+
+        assert result.exit_code == 0
+        assert "Created project config" in result.output
+
+        # Config should now be valid
+        new_content = config_file.read_text()
+        assert "claude: null" not in new_content
+
+    def test_run_command_fails_with_invalid_config(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Run command fails with helpful error on invalid config."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create invalid config
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("claude: null\n")
+
+        result = runner.invoke(main, ["run"])
+
+        assert result.exit_code != 0
+        assert result.exception is not None
+
+    def test_upgrade_command_works_with_invalid_config(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Upgrade command succeeds even with invalid config file."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create invalid config
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("claude: null\n")
+
+        result = runner.invoke(main, ["upgrade"])
+
+        # Should succeed (shows instructions for non-venv install)
+        assert result.exit_code == 0
+
+
 class TestUpgradeCommand:
     """Tests for the upgrade command."""
 
