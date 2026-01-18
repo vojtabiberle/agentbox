@@ -214,6 +214,129 @@ agentbox automatically tags container images based on your configuration:
 
 This allows multiple projects with different toolsets to coexist without rebuilding images.
 
+## Toolsets
+
+Toolsets are plugins that define what gets installed in your container image. Each toolset can include packages, configure mounts, and set environment variables.
+
+### Built-in Toolsets
+
+agentbox includes these built-in toolsets:
+
+| Toolset | Description |
+|---------|-------------|
+| `base` | Git, Node.js, ripgrep, fd, bat, fzf, jq, yq, gh, Claude Code |
+| `python` | Python 3 + pip |
+| `go` | Go programming language |
+| `rust` | Rust via rustup |
+| `php` | PHP + Composer |
+| `cloud-aws` | AWS CLI (mounts `~/.aws`) |
+| `cloud-azure` | Azure CLI (mounts `~/.azure`) |
+| `cloud-gcloud` | Google Cloud CLI (mounts `~/.config/gcloud`) |
+| `docker` | Docker CLI |
+
+Use `agentbox toolset <name>` to see details about a specific toolset, including mounts and dependencies.
+
+### Toolset Discovery Paths
+
+Toolsets are discovered from three locations (later overrides earlier):
+
+1. **Built-in**: Packaged with agentbox (cannot be modified)
+2. **User/Global**: `~/.config/agentbox/plugins/<toolset-name>/`
+3. **Project**: `<workspace>/.agentbox/plugins/<toolset-name>/`
+
+This means you can:
+- Override built-in toolsets by creating one with the same name in user or project plugins
+- Create custom toolsets for personal use (user plugins)
+- Create project-specific toolsets (project plugins)
+
+### Creating Custom Toolsets
+
+To create a custom toolset, create a directory with a `toolset.yaml` file:
+
+```
+~/.config/agentbox/plugins/
+└── my-toolset/
+    └── toolset.yaml
+```
+
+Or for project-specific toolsets:
+
+```
+<workspace>/.agentbox/plugins/
+└── my-toolset/
+    └── toolset.yaml
+```
+
+### Toolset Structure
+
+A `toolset.yaml` file has this structure:
+
+```yaml
+# Required fields
+name: my-toolset
+description: My custom development tools
+
+# Optional: dependencies (will be loaded first)
+depends_on:
+  - base
+
+# Optional: priority for ordering (lower = earlier, default: 50)
+priority: 50
+
+# Optional: Dockerfile fragment (RUN commands to install packages)
+dockerfile: |
+  RUN dnf install -y some-package && dnf clean all
+  RUN pip install some-python-package
+
+# Optional: directories to mount into container
+mounts:
+  - source: ~/.my-config        # Host path (~ expanded)
+    target: /home/user/.my-config  # Container path
+    readonly: true              # Optional, default: false
+    description: My tool config # Optional, for documentation
+
+# Optional: environment variables to set
+environment:
+  MY_VAR: some-value
+  MY_CONFIG: /home/user/.my-config
+```
+
+### Example: Custom Node.js Toolset
+
+```yaml
+# ~/.config/agentbox/plugins/node-lts/toolset.yaml
+name: node-lts
+description: Node.js LTS with pnpm and common tools
+depends_on:
+  - base
+priority: 55
+
+dockerfile: |
+  # Install pnpm globally
+  RUN npm install -g pnpm
+
+  # Install common dev tools
+  RUN npm install -g typescript ts-node eslint prettier
+```
+
+### Example: Project-Specific Database Toolset
+
+```yaml
+# <workspace>/.agentbox/plugins/myproject-db/toolset.yaml
+name: myproject-db
+description: PostgreSQL client for myproject
+depends_on:
+  - base
+priority: 90
+
+dockerfile: |
+  RUN dnf install -y postgresql && dnf clean all
+
+environment:
+  PGHOST: localhost
+  PGPORT: "5432"
+```
+
 ## How it works
 
 - **Workspace isolation**: Only the specified directory is mounted at `/workspace`
