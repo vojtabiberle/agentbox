@@ -98,9 +98,9 @@ Future development ideas for agentbox.
 - [ ] `Dockerfile.agentbox` support — when found in project root, extend the base image:
   - Detects `Dockerfile.agentbox` in workspace root (monorepo subdirectories not supported for now)
   - Builds a project-specific image combining base toolsets + custom instructions
-  - **Image naming**: Create separate image `agentbox:<project-hash>` to avoid polluting base image
+  - [x] **Image naming**: Create separate image `agentbox:<project>-<hash>` to avoid polluting base image
     - Allows per-project caching
-    - Base `agentbox:latest` remains shared across projects
+    - Base `agentbox:latest` remains shared across projects (used for global config)
   - **Build rules**:
     - Custom file uses `FROM agentbox:latest` (injected automatically or required)
     - Runs after all toolset configuration is applied

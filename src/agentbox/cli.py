@@ -94,7 +94,8 @@ def run(
     runtime = ContainerRuntime(config.runtime)
 
     # Build image if needed (with workspace for plugin discovery)
-    builder = ImageBuilder(runtime, config, workspace=workspace_path)
+    config_path: Path | None = ctx.obj["config_path"]
+    builder = ImageBuilder(runtime, config, workspace=workspace_path, config_path=config_path)
     image_name = builder.ensure_image(force_rebuild=rebuild)
 
     # Get agent configuration
@@ -128,8 +129,9 @@ def run(
 def build(ctx: click.Context, rebuild: bool) -> None:
     """Build the container image."""
     config: Config = ctx.obj["config"]
+    config_path: Path | None = ctx.obj["config_path"]
     runtime = ContainerRuntime(config.runtime)
-    builder = ImageBuilder(runtime, config)
+    builder = ImageBuilder(runtime, config, config_path=config_path)
 
     image_name = builder.ensure_image(force_rebuild=rebuild)
     console.print(f"[green]Image ready:[/green] {image_name}")
