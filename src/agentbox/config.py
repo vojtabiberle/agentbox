@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+
+from agentbox.exceptions import ConfigError
 
 
 class CredentialsConfig(BaseModel):
@@ -50,12 +52,34 @@ def load_config() -> tuple[Config, Path | None]:
 
     Returns:
         Tuple of (config, config_file_path or None if using defaults)
+
+    Raises:
+        ConfigError: If config file exists but contains invalid configuration
     """
     for path in get_config_paths():
         if path.exists():
-            with open(path) as f:
-                data = yaml.safe_load(f) or {}
-            return Config.model_validate(data), path
+            try:
+                with open(path) as f:
+                    data = yaml.safe_load(f) or {}
+                return Config.model_validate(data), path
+            except yaml.YAMLError as e:
+                raise ConfigError(
+                    f"Invalid YAML in config file: {path}\n"
+                    f"  Error: {e}\n"
+                    f"  Fix the syntax or run 'agentbox config init --force' to recreate"
+                ) from None
+            except ValidationError as e:
+                # Format pydantic errors nicely
+                errors = []
+                for err in e.errors():
+                    loc = ".".join(str(x) for x in err["loc"])
+                    msg = err["msg"]
+                    errors.append(f"  - {loc}: {msg}")
+                raise ConfigError(
+                    f"Invalid configuration in: {path}\n"
+                    + "\n".join(errors)
+                    + "\n  Fix the values or run 'agentbox config init --force' to recreate"
+                ) from None
 
     return Config(), None
 
@@ -94,7 +118,8 @@ toolsets:
 
 # Project-specific Claude settings
 # claude:
-#   # plugins_dir: ./.agentbox/plugins
+#   global_claude_md: ~/dotfiles/CLAUDE.md
+#   plugins_dir: ./.agentbox/plugins
 """
     else:
         return """\
@@ -118,9 +143,9 @@ credentials:
   ssh_agent: false # SSH_AUTH_SOCK forwarding
 
 # Claude-specific settings
-claude:
-  # global_claude_md: ~/dotfiles/CLAUDE.md
-  # plugins_dir: ~/dotfiles/claude-plugins
+# claude:
+#   global_claude_md: ~/dotfiles/CLAUDE.md
+#   plugins_dir: ~/dotfiles/claude-plugins
 """
 
 
