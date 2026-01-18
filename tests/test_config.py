@@ -222,3 +222,106 @@ class TestSaveProjectConfig:
 
         assert "toolsets:" in content
         assert "project configuration" in content.lower()
+
+
+class TestGeneratedConfigValidity:
+    """Tests to ensure generated configs are always valid."""
+
+    def test_global_config_is_loadable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Generated global config can be loaded without errors."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        # Generate config
+        save_global_config()
+
+        # Should load without error
+        config, path = load_config()
+        assert path is not None
+        assert config.runtime in ("podman", "docker")
+        assert "base" in config.toolsets
+
+    def test_project_config_is_loadable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Generated project config can be loaded without errors."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))  # Avoid global config
+
+        # Generate config
+        save_project_config()
+
+        # Should load without error
+        config, path = load_config()
+        assert path is not None
+        assert path.name == ".agentbox.yaml"
+        assert "base" in config.toolsets
+
+
+class TestConfigErrorHandling:
+    """Tests for config error handling."""
+
+    def test_invalid_yaml_shows_helpful_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Invalid YAML syntax shows helpful error message."""
+        from agentbox.exceptions import ConfigError
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create invalid YAML (tabs are not allowed in YAML)
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("runtime:\n\t- invalid")
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_config()
+
+        error_msg = str(exc_info.value)
+        assert "Invalid YAML" in error_msg
+        assert str(config_file) in error_msg
+        assert "agentbox config init --force" in error_msg
+
+    def test_invalid_config_value_shows_helpful_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Invalid config value shows helpful error message."""
+        from agentbox.exceptions import ConfigError
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create config with invalid value (claude: null instead of dict)
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("runtime: podman\nclaude: null\n")
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_config()
+
+        error_msg = str(exc_info.value)
+        assert "Invalid configuration" in error_msg
+        assert "claude" in error_msg
+        assert "agentbox config init --force" in error_msg
+
+    def test_invalid_runtime_shows_helpful_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Invalid runtime value shows helpful error message."""
+        from agentbox.exceptions import ConfigError
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+        # Create config with invalid runtime
+        config_file = tmp_path / ".agentbox.yaml"
+        config_file.write_text("runtime: invalid-runtime\n")
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_config()
+
+        error_msg = str(exc_info.value)
+        assert "Invalid configuration" in error_msg
+        assert "runtime" in error_msg
