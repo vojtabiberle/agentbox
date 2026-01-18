@@ -19,7 +19,7 @@ from .config import (
     save_project_config,
 )
 from .container import ContainerRuntime
-from .exceptions import AgentboxError, PluginError
+from .exceptions import AgentboxError, ConfigError, PluginError
 from .image import ImageBuilder
 from .plugins import PluginManager
 
@@ -32,9 +32,24 @@ console = Console(stderr=True)
 def main(ctx: click.Context) -> None:
     """Run AI coding agents in isolated containers."""
     ctx.ensure_object(dict)
-    config, config_path = load_config()
-    ctx.obj["config"] = config
-    ctx.obj["config_path"] = config_path
+
+    # Commands that can run even with invalid config
+    safe_commands = {"config", "upgrade"}
+
+    try:
+        config, config_path = load_config()
+        ctx.obj["config"] = config
+        ctx.obj["config_path"] = config_path
+        ctx.obj["config_error"] = None
+    except ConfigError as e:
+        # Store error and use defaults - let safe commands proceed
+        ctx.obj["config"] = Config()
+        ctx.obj["config_path"] = None
+        ctx.obj["config_error"] = e
+
+        # If invoking an unsafe command, raise the error now
+        if ctx.invoked_subcommand and ctx.invoked_subcommand not in safe_commands:
+            raise
 
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
@@ -135,9 +150,18 @@ def config_show(ctx: click.Context) -> None:
     """Show current configuration."""
     cfg: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
+    config_error = ctx.obj.get("config_error")
+
+    # Show warning if config file is invalid
+    if config_error:
+        console.print("[red]Warning: Invalid config file (using defaults)[/red]")
+        console.print(f"[red]{config_error}[/red]")
+        console.print()
 
     if config_path:
         console.print(f"[cyan]Config file:[/cyan] {config_path}")
+    elif config_error:
+        console.print("[yellow]Config file:[/yellow] Invalid (see error above)")
     else:
         console.print("[yellow]Config file:[/yellow] None (using defaults)")
         console.print("[dim]  Run 'agentbox config init' to create one[/dim]")

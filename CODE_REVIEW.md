@@ -1,7 +1,7 @@
 # Code Review
 
-Branch: `agentbox-upgrade`  
-Commit: `f0cb24e`
+Branch: `fix-config-init-2`  
+Commit: `36db4db`
 
 ## Findings
 No issues found in the updated changes.
