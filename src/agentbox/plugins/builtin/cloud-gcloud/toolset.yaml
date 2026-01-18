@@ -1,0 +1,24 @@
+name: cloud-gcloud
+description: Google Cloud CLI support
+depends_on:
+  - base
+priority: 80
+
+dockerfile: |
+  # Google Cloud CLI
+  RUN cat > /etc/yum.repos.d/google-cloud-sdk.repo <<'GCLOUD_REPO'
+  [google-cloud-cli]
+  name=Google Cloud CLI
+  baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
+  enabled=1
+  gpgcheck=1
+  repo_gpgcheck=0
+  gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+  GCLOUD_REPO
+  RUN dnf install -y google-cloud-cli && dnf clean all
+
+mounts:
+  - source: ~/.config/gcloud
+    target: /home/user/.config/gcloud
+    readonly: true
+    description: Google Cloud credentials and config

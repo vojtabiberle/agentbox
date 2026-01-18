@@ -52,6 +52,9 @@ Repository = "https://github.com/vojtabiberle/agentbox"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentbox"]
 
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/agentbox/**",

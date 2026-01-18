@@ -7,6 +7,7 @@ from rich.console import Console
 
 from .config import Config
 from .container import ContainerRuntime
+from .plugins import PluginManager
 
 console = Console()
 
@@ -14,9 +15,15 @@ console = Console()
 class ImageBuilder:
     """Build container images from templates."""
 
-    def __init__(self, runtime: ContainerRuntime, config: Config) -> None:
+    def __init__(
+        self,
+        runtime: ContainerRuntime,
+        config: Config,
+        workspace: Path | None = None,
+    ) -> None:
         self.runtime = runtime
         self.config = config
+        self.plugin_manager = PluginManager(workspace)
         self._setup_jinja()
 
     def _setup_jinja(self) -> None:
@@ -41,6 +48,9 @@ class ImageBuilder:
         """Ensure the container image exists, building if necessary."""
         image_name = self.config.image_name
 
+        # Always load plugins so mounts/env are available even on cache hits
+        self.plugin_manager.load(self.config.toolsets)
+
         if not force_rebuild and self.runtime.image_exists(image_name):
             return image_name
 
@@ -58,7 +68,10 @@ class ImageBuilder:
 
     def _render_dockerfile(self) -> str:
         """Render the Dockerfile from templates."""
+        # Get dockerfile fragments from already-loaded plugins
+        dockerfile_fragments = self.plugin_manager.get_dockerfile_fragments()
+
         template = self.env.get_template("Dockerfile.j2")
         return template.render(
-            toolsets=self.config.toolsets,
+            dockerfile_fragments=dockerfile_fragments,
         )

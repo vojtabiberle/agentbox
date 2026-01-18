@@ -1,0 +1,10 @@
+name: rust
+description: Rust development environment with rustup
+depends_on:
+  - base
+priority: 50
+
+dockerfile: |
+  # Rust development
+  RUN dnf install -y rustup && dnf clean all
+  RUN rustup-init -y

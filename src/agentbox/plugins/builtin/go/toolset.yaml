@@ -1,0 +1,9 @@
+name: go
+description: Go development environment
+depends_on:
+  - base
+priority: 50
+
+dockerfile: |
+  # Go development
+  RUN dnf install -y golang && dnf clean all

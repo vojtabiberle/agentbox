@@ -1,87 +1,9 @@
 FROM fedora:42
 
-{% if "base" in toolsets %}
-# Base development tools
-RUN dnf install -y \
-    git git-lfs \
-    tmux htop vim \
-    ripgrep fd-find bat fzf \
-    jq yq \
-    openssh-clients \
-    keychain \
-    gh \
-    && dnf clean all
+{% for fragment in dockerfile_fragments %}
+{{ fragment }}
 
-# Node.js (required for Claude Code)
-RUN dnf install -y nodejs npm && dnf clean all
-
-# Claude Code
-RUN npm install -g @anthropic-ai/claude-code
-{% endif %}
-
-{% if "python" in toolsets %}
-# Python development
-RUN dnf install -y \
-    python3 python3-pip python3-devel \
-    && dnf clean all
-{% endif %}
-
-{% if "go" in toolsets %}
-# Go development
-RUN dnf install -y golang && dnf clean all
-{% endif %}
-
-{% if "rust" in toolsets %}
-# Rust development
-RUN dnf install -y rustup && dnf clean all
-RUN rustup-init -y
-{% endif %}
-
-{% if "php" in toolsets %}
-# PHP development
-RUN dnf install -y \
-    php php-cli php-devel php-common \
-    php-mbstring php-xml php-pdo \
-    php-mysqlnd php-pgsql \
-    php-curl php-gd php-intl \
-    php-bcmath php-zip php-opcache \
-    php-sodium php-fpm \
-    composer \
-    && dnf clean all
-{% endif %}
-
-{% if "cloud-aws" in toolsets %}
-# AWS CLI
-RUN dnf install -y awscli2 && dnf clean all
-{% endif %}
-
-{% if "cloud-azure" in toolsets %}
-# Azure CLI
-RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc \
-    && dnf install -y https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm 2>/dev/null || true \
-    && dnf install -y azure-cli \
-    && dnf clean all
-{% endif %}
-
-{% if "cloud-gcloud" in toolsets %}
-# Google Cloud CLI
-RUN cat > /etc/yum.repos.d/google-cloud-sdk.repo <<'GCLOUD_REPO'
-[google-cloud-cli]
-name=Google Cloud CLI
-baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-GCLOUD_REPO
-RUN dnf install -y google-cloud-cli && dnf clean all
-{% endif %}
-
-{% if "docker" in toolsets %}
-# Docker CLI (for interacting with host docker socket if mounted)
-RUN dnf install -y docker-cli && dnf clean all
-{% endif %}
-
+{% endfor %}
 # Create /home structure with permissive permissions for dynamic home paths
 # The actual home directory (matching host's $HOME) will be bind-mounted at runtime
 RUN mkdir -p /home && chmod 755 /home

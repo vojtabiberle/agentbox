@@ -100,10 +100,15 @@ class TestRenderDockerfile:
 
         assert "FROM" in dockerfile
 
-    def test_render_dockerfile_passes_toolsets(self, mock_runtime: MagicMock) -> None:
-        """Toolsets are passed to template rendering."""
+    def test_render_dockerfile_passes_dockerfile_fragments(
+        self, mock_runtime: MagicMock
+    ) -> None:
+        """Dockerfile fragments from plugins are passed to template rendering."""
         config = Config(toolsets=["base", "python", "go"])
         builder = ImageBuilder(mock_runtime, config)
+
+        # Load plugins first (normally done by ensure_image)
+        builder.plugin_manager.load(config.toolsets)
 
         # Mock the template to capture render args
         mock_template = MagicMock()
@@ -112,9 +117,13 @@ class TestRenderDockerfile:
 
         builder._render_dockerfile()
 
-        mock_template.render.assert_called_once_with(
-            toolsets=["base", "python", "go"]
-        )
+        # Verify render was called with dockerfile_fragments
+        mock_template.render.assert_called_once()
+        call_kwargs = mock_template.render.call_args[1]
+        assert "dockerfile_fragments" in call_kwargs
+        assert isinstance(call_kwargs["dockerfile_fragments"], list)
+        # Should have fragments for base, python, go (3 fragments)
+        assert len(call_kwargs["dockerfile_fragments"]) == 3
 
     def test_render_dockerfile_with_different_toolsets(
         self, mock_runtime: MagicMock

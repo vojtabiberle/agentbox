@@ -1,0 +1,18 @@
+name: cloud-aws
+description: AWS CLI and SDK support
+depends_on:
+  - base
+priority: 80
+
+dockerfile: |
+  # AWS CLI
+  RUN dnf install -y awscli2 && dnf clean all
+
+mounts:
+  - source: ~/.aws
+    target: /home/user/.aws
+    readonly: true
+    description: AWS credentials and config
+
+environment:
+  AWS_CONFIG_FILE: /home/user/.aws/config

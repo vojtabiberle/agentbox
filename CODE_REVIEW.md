@@ -1,15 +1,13 @@
 # Code Review
 
 ## Scope
-- `ROADMAP.md`
-- All Python files under `src/` and `tests/`
+- Current branch changes in `src/`, `tests/`, and plugin toolset YAMLs
 
 ## Findings
-- None found in current Python code review.
+- None found in current branch changes.
 
 ## Questions / Assumptions
-- Are plugin manifests meant to be YAML-only, or should JSON/TOML also be accepted? `ROADMAP.md`
-- `Dockerfile.agentbox` is project root only for now; monorepo subdirectories not supported initially. `ROADMAP.md`
+- Should `agentbox build` accept a `--workspace` argument so project-level plugins can be used when building outside `run`? `src/agentbox/cli.py`
 
 ## Testing
 - Not run (review only).

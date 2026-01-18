@@ -82,12 +82,12 @@ main() {
     info "Creating virtual environment..."
     "$PYTHON" -m venv "$INSTALL_DIR/venv"
 
-    # Install agentbox
+    # Install agentbox from GitHub
     info "Installing agentbox..."
     if [[ "$VERSION" == "latest" ]]; then
-        "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade agentbox
+        "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade "git+https://github.com/vojtabiberle/agentbox.git"
     else
-        "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade "agentbox==$VERSION"
+        "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade "git+https://github.com/vojtabiberle/agentbox.git@$VERSION"
     fi
 
     # Create bin directory and symlink
