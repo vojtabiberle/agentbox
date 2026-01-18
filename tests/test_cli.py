@@ -519,9 +519,8 @@ class TestUpgradeCommand:
         fake_pip = venv_bin / "pip"
         fake_pip.touch()
 
-        # Mock sys.executable to be inside the venv
-        fake_python = venv_bin / "python"
-        monkeypatch.setattr("sys.executable", str(fake_python))
+        # Mock sys.prefix to point to the venv (standard way to detect active venv)
+        monkeypatch.setattr("sys.prefix", str(venv_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         with patch("subprocess.run") as mock_run:
@@ -550,9 +549,8 @@ class TestUpgradeCommand:
         fake_pip = venv_bin / "pip"
         fake_pip.touch()
 
-        # Mock sys.executable to be inside the venv
-        fake_python = venv_bin / "python"
-        monkeypatch.setattr("sys.executable", str(fake_python))
+        # Mock sys.prefix to point to the venv (standard way to detect active venv)
+        monkeypatch.setattr("sys.prefix", str(venv_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         with patch("subprocess.run") as mock_run:
@@ -581,9 +579,8 @@ class TestUpgradeCommand:
         venv_bin = venv_path / "bin"
         venv_bin.mkdir(parents=True)
 
-        # Mock sys.executable to be inside the venv
-        fake_python = venv_bin / "python"
-        monkeypatch.setattr("sys.executable", str(fake_python))
+        # Mock sys.prefix to point to the venv (standard way to detect active venv)
+        monkeypatch.setattr("sys.prefix", str(venv_path))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         with patch("subprocess.run") as mock_run:

@@ -269,10 +269,12 @@ def upgrade() -> None:
     import subprocess
 
     # Check if running from ~/.agentbox/venv (installed via install.sh)
+    # Use sys.prefix which is the standard way to detect the active venv
     venv_path = Path.home() / ".agentbox" / "venv"
-    current_executable = Path(sys.executable).resolve()
+    current_prefix = Path(sys.prefix).resolve()
+    venv_resolved = venv_path.resolve() if venv_path.exists() else venv_path
 
-    if venv_path in current_executable.parents or current_executable.parent.parent == venv_path:
+    if current_prefix == venv_resolved:
         console.print("[cyan]Upgrading agentbox...[/cyan]")
         pip_path = venv_path / "bin" / "pip"
 
