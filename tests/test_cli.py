@@ -406,6 +406,110 @@ class TestToolsetCommand:
         assert "~/.aws" in result.output
 
 
+class TestUpgradeCommand:
+    """Tests for the upgrade command."""
+
+    def test_upgrade_shows_instructions_for_non_venv_install(
+        self,
+        runner: CliRunner,
+    ) -> None:
+        """Upgrade command shows instructions when not installed via install.sh."""
+        result = runner.invoke(main, ["upgrade"])
+
+        # When not in ~/.agentbox/venv, should show instructions
+        assert result.exit_code == 0
+        assert "not installed via install.sh" in result.output or "pipx" in result.output
+
+    def test_upgrade_runs_pip_when_in_venv(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Upgrade command runs pip when installed via install.sh."""
+        # Create fake venv structure
+        venv_path = tmp_path / ".agentbox" / "venv"
+        venv_bin = venv_path / "bin"
+        venv_bin.mkdir(parents=True)
+        fake_pip = venv_bin / "pip"
+        fake_pip.touch()
+
+        # Mock sys.executable to be inside the venv
+        fake_python = venv_bin / "python"
+        monkeypatch.setattr("sys.executable", str(fake_python))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+            result = runner.invoke(main, ["upgrade"])
+
+            assert result.exit_code == 0
+            assert "upgraded successfully" in result.output
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[0][0]
+            assert "pip" in call_args[0]
+            assert "--force-reinstall" in call_args
+
+    def test_upgrade_shows_error_on_pip_failure(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Upgrade command shows both stdout and stderr on pip failure."""
+        # Create fake venv structure
+        venv_path = tmp_path / ".agentbox" / "venv"
+        venv_bin = venv_path / "bin"
+        venv_bin.mkdir(parents=True)
+        fake_pip = venv_bin / "pip"
+        fake_pip.touch()
+
+        # Mock sys.executable to be inside the venv
+        fake_python = venv_bin / "python"
+        monkeypatch.setattr("sys.executable", str(fake_python))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=1,
+                stdout="Some stdout error",
+                stderr="Some stderr error",
+            )
+
+            result = runner.invoke(main, ["upgrade"])
+
+            assert result.exit_code == 1
+            assert "Error upgrading" in result.output
+            assert "Some stdout error" in result.output
+            assert "Some stderr error" in result.output
+
+    def test_upgrade_handles_missing_pip(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Upgrade command handles missing pip gracefully."""
+        # Create fake venv structure without pip
+        venv_path = tmp_path / ".agentbox" / "venv"
+        venv_bin = venv_path / "bin"
+        venv_bin.mkdir(parents=True)
+
+        # Mock sys.executable to be inside the venv
+        fake_python = venv_bin / "python"
+        monkeypatch.setattr("sys.executable", str(fake_python))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("pip not found")
+
+            result = runner.invoke(main, ["upgrade"])
+
+            assert result.exit_code == 1
+            assert "pip not found" in result.output
+
+
 class TestErrorHandling:
     """Tests for CLI error handling."""
 
