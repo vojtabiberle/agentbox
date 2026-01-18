@@ -41,6 +41,12 @@ curl -fsSL https://raw.githubusercontent.com/vojtabiberle/agentbox/main/install.
 
 This creates a self-contained installation at `~/.agentbox` and symlinks the binary to `~/.local/bin`.
 
+To upgrade an install.sh installation:
+
+```bash
+agentbox upgrade
+```
+
 ### From source
 
 ```bash
@@ -89,7 +95,16 @@ Options:
   --rebuild         Force rebuild the container image
 
 agentbox build [--rebuild]   Build the container image
+
 agentbox config              Show current configuration
+agentbox config show         Show current configuration (same as above)
+agentbox config init         Create global config (~/.config/agentbox/config.yaml)
+agentbox config init --project   Create project config (.agentbox.yaml in current dir)
+agentbox config init --force     Overwrite existing config file
+
+agentbox toolset <name>      Show details about a specific toolset
+
+agentbox upgrade             Upgrade agentbox (if installed via install.sh)
 ```
 
 ### Recommended: Git Worktree Workflow
@@ -125,6 +140,23 @@ git worktree remove ~/worktrees/myproject/feature-auth
 
 ## Configuration
 
+agentbox looks for configuration in this order:
+1. `.agentbox.yaml` or `.agentbox.yml` in the current directory (project config)
+2. `~/.config/agentbox/config.yaml` or `config.yml` (global config)
+3. `~/.agentbox.yaml` (legacy global config)
+
+Use `agentbox config init` to create a config file:
+
+```bash
+# Create global config
+agentbox config init
+
+# Create project-specific config
+agentbox config init --project
+```
+
+### Global Config
+
 Create `~/.config/agentbox/config.yaml`:
 
 ```yaml
@@ -156,6 +188,31 @@ claude:
   global_claude_md: ~/dotfiles/CLAUDE.md
   plugins_dir: ~/dotfiles/claude-plugins
 ```
+
+### Project Config
+
+Create `.agentbox.yaml` in your project directory to override global settings:
+
+```yaml
+# Project-specific toolsets
+toolsets:
+  - base
+  - python
+  - cloud-aws
+
+# Project-specific credentials
+credentials:
+  aws: true
+```
+
+### Image Tagging
+
+agentbox automatically tags container images based on your configuration:
+
+- **Global config**: Uses default image name (`agentbox:latest`)
+- **Project config**: Uses unique tag based on project name and config hash (`agentbox:myproject-a1b2c3d4`)
+
+This allows multiple projects with different toolsets to coexist without rebuilding images.
 
 ## How it works
 
