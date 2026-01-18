@@ -14,6 +14,15 @@ dockerfile: |
       gh \
       && dnf clean all
 
+  # Pre-populate SSH known_hosts for common Git hosts
+  # This prevents "authenticity of host" prompts during git operations
+  RUN mkdir -p /home/user/.ssh && chmod 700 /home/user/.ssh \
+      && ssh-keyscan -t ed25519,rsa github.com >> /home/user/.ssh/known_hosts 2>/dev/null \
+      && ssh-keyscan -t ed25519,rsa gitlab.com >> /home/user/.ssh/known_hosts 2>/dev/null \
+      && ssh-keyscan -t ed25519,rsa bitbucket.org >> /home/user/.ssh/known_hosts 2>/dev/null \
+      && chmod 644 /home/user/.ssh/known_hosts \
+      && chown -R user:user /home/user/.ssh
+
   # Node.js (required for Claude Code)
   RUN dnf install -y nodejs npm && dnf clean all
 
