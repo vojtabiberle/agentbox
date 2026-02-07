@@ -1,15 +1,16 @@
 FROM fedora:42
 
-{% for fragment in dockerfile_fragments %}
-{{ fragment }}
-
-{% endfor %}
 # Create /home structure with permissive permissions for dynamic home paths
 # The actual home directory (matching host's $HOME) will be bind-mounted at runtime
 RUN mkdir -p /home && chmod 755 /home
 
 # Create user with UID 1000 for rootless containers
 # Home directory will be created/mounted at runtime to match host path
+# Note: User must be created early so toolset fragments can reference it
 RUN useradd -M -u 1000 -s /bin/bash user
 
+{% for fragment in dockerfile_fragments %}
+{{ fragment }}
+
+{% endfor %}
 WORKDIR /workspace
