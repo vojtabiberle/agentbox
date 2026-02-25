@@ -82,6 +82,10 @@ class ContainerRuntime:
             "-e",
             f"TERM={os.environ.get('TERM', 'xterm-256color')}",
             "-e",
+            f"COLUMNS={self._get_terminal_columns()}",
+            "-e",
+            f"LINES={self._get_terminal_lines()}",
+            "-e",
             f"HOME={host_home}",
             "-e",
             f"PATH=/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
@@ -134,6 +138,26 @@ class ContainerRuntime:
 
         # Replace current process with container
         os.execvp(cmd[0], cmd)
+
+    @staticmethod
+    def _get_terminal_columns() -> str:
+        """Get terminal column count from env or OS, fallback to 80."""
+        if "COLUMNS" in os.environ:
+            return os.environ["COLUMNS"]
+        try:
+            return str(os.get_terminal_size().columns)
+        except (ValueError, OSError):
+            return "80"
+
+    @staticmethod
+    def _get_terminal_lines() -> str:
+        """Get terminal line count from env or OS, fallback to 24."""
+        if "LINES" in os.environ:
+            return os.environ["LINES"]
+        try:
+            return str(os.get_terminal_size().lines)
+        except (ValueError, OSError):
+            return "24"
 
     def _vol_suffix(self, mode: str = "") -> str:
         """Get volume suffix based on runtime. Mode can be 'ro' or 'rw' or empty."""
