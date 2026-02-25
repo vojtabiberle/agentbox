@@ -4,9 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from agentbox.git import GitWorktreeInfo, detect_worktree
+from agentbox.git import detect_worktree
 
 
 class TestDetectWorktreeNonGit:
@@ -35,16 +33,32 @@ class TestDetectWorktreeRegularRepo:
 class TestDetectWorktreeActualWorktree:
     """Tests using real git worktrees."""
 
+    @staticmethod
+    def _init_repo_with_commit(repo_path: Path) -> None:
+        """Initialize a git repo with one commit (CI-safe)."""
+        git = ["git", "-C", str(repo_path)]
+        subprocess.run([*git, "init"], capture_output=True, check=True)
+        subprocess.run(
+            [*git, "config", "user.email", "test@test.com"],
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            [*git, "config", "user.name", "Test"],
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            [*git, "commit", "--allow-empty", "-m", "init"],
+            capture_output=True,
+            check=True,
+        )
+
     def test_worktree_needs_mount(self, tmp_path: Path) -> None:
         """Worktree (.git is a file) returns needs_mount=True with correct paths."""
         main_repo = tmp_path / "main"
         main_repo.mkdir()
-        subprocess.run(["git", "init", str(main_repo)], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "-C", str(main_repo), "commit", "--allow-empty", "-m", "init"],
-            capture_output=True,
-            check=True,
-        )
+        self._init_repo_with_commit(main_repo)
 
         wt_path = tmp_path / "worktree"
         subprocess.run(
@@ -62,12 +76,7 @@ class TestDetectWorktreeActualWorktree:
         """Worktree's git_dir is under main .git/worktrees/."""
         main_repo = tmp_path / "main"
         main_repo.mkdir()
-        subprocess.run(["git", "init", str(main_repo)], capture_output=True, check=True)
-        subprocess.run(
-            ["git", "-C", str(main_repo), "commit", "--allow-empty", "-m", "init"],
-            capture_output=True,
-            check=True,
-        )
+        self._init_repo_with_commit(main_repo)
 
         wt_path = tmp_path / "worktree"
         subprocess.run(

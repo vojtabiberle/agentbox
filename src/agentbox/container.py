@@ -148,9 +148,7 @@ class ContainerRuntime:
                 return f":{mode}"
             return ""
 
-    def _add_git_mounts(
-        self, cmd: list[str], git_worktree: GitWorktreeInfo | None
-    ) -> None:
+    def _add_git_mounts(self, cmd: list[str], git_worktree: GitWorktreeInfo | None) -> None:
         """Add mounts for git worktree support.
 
         Mounts the main repo's .git directory at its original host path

@@ -86,7 +86,7 @@ def _detect_via_file_parsing(workspace: Path) -> GitWorktreeInfo | None:
     if not content.startswith("gitdir:"):
         return None
 
-    gitdir_path = content[len("gitdir:"):].strip()
+    gitdir_path = content[len("gitdir:") :].strip()
     git_dir = (workspace / gitdir_path).resolve()
 
     # Read commondir file if it exists (points to main repo's .git)

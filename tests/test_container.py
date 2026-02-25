@@ -1,14 +1,13 @@
 """Tests for container runtime abstraction."""
 
-import os
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentbox.container import ContainerRuntime
 from agentbox.config import Config
+from agentbox.container import ContainerRuntime
 from agentbox.exceptions import RuntimeNotFoundError
 from agentbox.git import GitWorktreeInfo
 
@@ -429,9 +428,7 @@ class TestAddGitMounts:
         # git_dir is under common_dir, so only one mount
         assert cmd.count("-v") == 1
 
-    def test_git_dir_not_under_common_dir_both_mounted(
-        self, runtime: ContainerRuntime
-    ) -> None:
+    def test_git_dir_not_under_common_dir_both_mounted(self, runtime: ContainerRuntime) -> None:
         """Both common_dir and git_dir mounted when git_dir is outside common_dir."""
         info = GitWorktreeInfo(
             git_common_dir=Path("/home/user/main-repo/.git"),
