@@ -8,6 +8,7 @@ from click.testing import CliRunner
 
 from agentbox.cli import main
 from agentbox.exceptions import RuntimeNotFoundError
+from agentbox.git import GitWorktreeInfo
 
 
 @pytest.fixture
@@ -169,6 +170,112 @@ class TestRunCommand:
             runner.invoke(main, ["run", "--rebuild"])
 
             mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
+
+
+class TestRunGitWorktree:
+    """Tests for git worktree support in the run command."""
+
+    def test_detect_worktree_called_by_default(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """detect_worktree is called with workspace path by default."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
+             patch("agentbox.cli.detect_worktree") as mock_detect:
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            mock_detect.return_value = None
+
+            runner.invoke(main, ["run"])
+
+            mock_detect.assert_called_once_with(tmp_path)
+
+    def test_no_git_mount_skips_detection(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--no-git-mount flag skips worktree detection entirely."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
+             patch("agentbox.cli.detect_worktree") as mock_detect:
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            runner.invoke(main, ["run", "--no-git-mount"])
+
+            mock_detect.assert_not_called()
+
+    def test_no_git_mount_passes_none_to_runtime(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--no-git-mount passes git_worktree=None to runtime.run()."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
+             patch("agentbox.cli.detect_worktree"):
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            runner.invoke(main, ["run", "--no-git-mount"])
+
+            mock_runtime.run.assert_called_once()
+            assert mock_runtime.run.call_args[1]["git_worktree"] is None
+
+    def test_worktree_result_passed_to_runtime(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """detect_worktree result is passed through to runtime.run()."""
+        monkeypatch.chdir(tmp_path)
+
+        worktree_info = GitWorktreeInfo(
+            git_common_dir=Path("/main/.git"),
+            git_dir=Path("/main/.git/worktrees/wt"),
+            needs_mount=True,
+        )
+
+        with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
+             patch("agentbox.cli.detect_worktree", return_value=worktree_info):
+            mock_runtime = MagicMock()
+            mock_runtime_cls.return_value = mock_runtime
+
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            runner.invoke(main, ["run"])
+
+            mock_runtime.run.assert_called_once()
+            assert mock_runtime.run.call_args[1]["git_worktree"] is worktree_info
 
 
 class TestBuildCommand:
