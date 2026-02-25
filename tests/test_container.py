@@ -10,6 +10,7 @@ import pytest
 from agentbox.container import ContainerRuntime
 from agentbox.config import Config
 from agentbox.exceptions import RuntimeNotFoundError
+from agentbox.git import GitWorktreeInfo
 
 
 class TestVerifyRuntime:
@@ -384,3 +385,121 @@ class TestRun:
             cmd = mock_exec.call_args[0][1]
             cmd_str = " ".join(cmd)
             assert "/mnt/ro0" in cmd_str
+
+
+class TestAddGitMounts:
+    """Tests for _add_git_mounts method."""
+
+    @pytest.fixture
+    def runtime(self) -> ContainerRuntime:
+        """Create a docker runtime."""
+        with patch("subprocess.run"):
+            return ContainerRuntime("docker")
+
+    def test_no_git_worktree_no_mount(self, runtime: ContainerRuntime) -> None:
+        """No git mounts when git_worktree is None."""
+        cmd: list[str] = []
+        runtime._add_git_mounts(cmd, None)
+        assert cmd == []
+
+    def test_needs_mount_false_no_mount(self, runtime: ContainerRuntime) -> None:
+        """No git mounts when needs_mount is False."""
+        info = GitWorktreeInfo(
+            git_common_dir=Path("/repo/.git"),
+            git_dir=Path("/repo/.git"),
+            needs_mount=False,
+        )
+        cmd: list[str] = []
+        runtime._add_git_mounts(cmd, info)
+        assert cmd == []
+
+    def test_worktree_mounts_common_dir(self, runtime: ContainerRuntime) -> None:
+        """Worktree mounts git_common_dir at same path with rw."""
+        info = GitWorktreeInfo(
+            git_common_dir=Path("/home/user/main-repo/.git"),
+            git_dir=Path("/home/user/main-repo/.git/worktrees/wt"),
+            needs_mount=True,
+        )
+        cmd: list[str] = []
+        runtime._add_git_mounts(cmd, info)
+
+        assert "-v" in cmd
+        cmd_str = " ".join(cmd)
+        assert "/home/user/main-repo/.git:/home/user/main-repo/.git:rw" in cmd_str
+        # git_dir is under common_dir, so only one mount
+        assert cmd.count("-v") == 1
+
+    def test_git_dir_not_under_common_dir_both_mounted(
+        self, runtime: ContainerRuntime
+    ) -> None:
+        """Both common_dir and git_dir mounted when git_dir is outside common_dir."""
+        info = GitWorktreeInfo(
+            git_common_dir=Path("/home/user/main-repo/.git"),
+            git_dir=Path("/somewhere/else/.git-dir"),
+            needs_mount=True,
+        )
+        cmd: list[str] = []
+        runtime._add_git_mounts(cmd, info)
+
+        assert cmd.count("-v") == 2
+        cmd_str = " ".join(cmd)
+        assert "/home/user/main-repo/.git:/home/user/main-repo/.git:rw" in cmd_str
+        assert "/somewhere/else/.git-dir:/somewhere/else/.git-dir:rw" in cmd_str
+
+    def test_run_passes_git_worktree(
+        self, runtime: ContainerRuntime, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """run() passes git_worktree to _add_git_mounts."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        info = GitWorktreeInfo(
+            git_common_dir=Path("/main/.git"),
+            git_dir=Path("/main/.git/worktrees/wt"),
+            needs_mount=True,
+        )
+        config = Config()
+
+        with patch("os.execvp") as mock_exec:
+            runtime.run(
+                image="agentbox",
+                workspace=workspace,
+                ro_mounts=[],
+                command=["bash"],
+                config=config,
+                git_worktree=info,
+            )
+
+            cmd = mock_exec.call_args[0][1]
+            cmd_str = " ".join(cmd)
+            assert "/main/.git:/main/.git:rw" in cmd_str
+
+    def test_run_without_git_worktree(
+        self, runtime: ContainerRuntime, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """run() works normally when git_worktree is None."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+
+        config = Config()
+
+        with patch("os.execvp") as mock_exec:
+            runtime.run(
+                image="agentbox",
+                workspace=workspace,
+                ro_mounts=[],
+                command=["bash"],
+                config=config,
+                git_worktree=None,
+            )
+
+            cmd = mock_exec.call_args[0][1]
+            cmd_str = " ".join(cmd)
+            # No git-specific mount should appear
+            assert cmd_str.count("/.git") == 0 or all(
+                ".claude" in part for part in cmd_str.split() if "/.git" in part
+            )

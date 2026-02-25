@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 
 from .config import Config
 from .exceptions import RuntimeNotFoundError
+from .git import GitWorktreeInfo
 
 if TYPE_CHECKING:
     from .plugins import PluginManager
@@ -61,6 +62,7 @@ class ContainerRuntime:
         command: list[str],
         config: Config,
         plugin_manager: PluginManager | None = None,
+        git_worktree: GitWorktreeInfo | None = None,
     ) -> None:
         """Run a container interactively."""
         # Use host's home path for consistent identity
@@ -111,6 +113,9 @@ class ContainerRuntime:
         for i, ro_path in enumerate(ro_mounts):
             cmd.extend(["-v", f"{ro_path}:/mnt/ro{i}{self._vol_suffix('ro')}"])
 
+        # Add git worktree mounts
+        self._add_git_mounts(cmd, git_worktree)
+
         # Add Claude config mount
         self._add_claude_mounts(cmd, config)
 
@@ -142,6 +147,26 @@ class ContainerRuntime:
             if mode:
                 return f":{mode}"
             return ""
+
+    def _add_git_mounts(
+        self, cmd: list[str], git_worktree: GitWorktreeInfo | None
+    ) -> None:
+        """Add mounts for git worktree support.
+
+        Mounts the main repo's .git directory at its original host path
+        so that the .git file's gitdir: reference resolves inside the container.
+        """
+        if git_worktree is None or not git_worktree.needs_mount:
+            return
+
+        rw = self._vol_suffix("rw")
+        common = str(git_worktree.git_common_dir)
+        cmd.extend(["-v", f"{common}:{common}{rw}"])
+
+        # If git_dir is not under common_dir, mount it separately
+        git_dir = str(git_worktree.git_dir)
+        if not git_dir.startswith(common + "/") and git_dir != common:
+            cmd.extend(["-v", f"{git_dir}:{git_dir}{rw}"])
 
     def _add_plugin_mounts(self, cmd: list[str], plugin_manager: PluginManager) -> None:
         """Add mounts from loaded plugins."""
