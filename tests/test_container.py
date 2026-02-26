@@ -1,5 +1,6 @@
 """Tests for container runtime abstraction."""
 
+import os
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -318,6 +319,144 @@ class TestAddClaudeMounts:
         runtime._add_claude_mounts(cmd, config)
 
         assert any("plugins" in c for c in cmd)
+
+
+class TestGetTerminalSize:
+    """Tests for _get_terminal_columns and _get_terminal_lines."""
+
+    @pytest.fixture
+    def runtime(self) -> ContainerRuntime:
+        """Create a docker runtime."""
+        with patch("subprocess.run"):
+            return ContainerRuntime("docker")
+
+    def test_columns_from_env(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """COLUMNS env var takes priority over OS detection."""
+        monkeypatch.setenv("COLUMNS", "200")
+        assert runtime._get_terminal_columns() == "200"
+
+    def test_lines_from_env(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """LINES env var takes priority over OS detection."""
+        monkeypatch.setenv("LINES", "50")
+        assert runtime._get_terminal_lines() == "50"
+
+    def test_columns_from_os_when_no_env(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to os.get_terminal_size() when COLUMNS not set."""
+        monkeypatch.delenv("COLUMNS", raising=False)
+        with patch("os.get_terminal_size", return_value=os.terminal_size((120, 40))):
+            assert runtime._get_terminal_columns() == "120"
+
+    def test_lines_from_os_when_no_env(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to os.get_terminal_size() when LINES not set."""
+        monkeypatch.delenv("LINES", raising=False)
+        with patch("os.get_terminal_size", return_value=os.terminal_size((120, 40))):
+            assert runtime._get_terminal_lines() == "40"
+
+    def test_columns_fallback_on_oserror(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to 80 when both env and OS detection fail."""
+        monkeypatch.delenv("COLUMNS", raising=False)
+        with patch("os.get_terminal_size", side_effect=OSError):
+            assert runtime._get_terminal_columns() == "80"
+
+    def test_lines_fallback_on_oserror(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to 24 when both env and OS detection fail."""
+        monkeypatch.delenv("LINES", raising=False)
+        with patch("os.get_terminal_size", side_effect=OSError):
+            assert runtime._get_terminal_lines() == "24"
+
+    def test_columns_fallback_on_value_error(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to 80 on ValueError from os.get_terminal_size()."""
+        monkeypatch.delenv("COLUMNS", raising=False)
+        with patch("os.get_terminal_size", side_effect=ValueError):
+            assert runtime._get_terminal_columns() == "80"
+
+    def test_lines_fallback_on_value_error(
+        self, runtime: ContainerRuntime, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Falls back to 24 on ValueError from os.get_terminal_size()."""
+        monkeypatch.delenv("LINES", raising=False)
+        with patch("os.get_terminal_size", side_effect=ValueError):
+            assert runtime._get_terminal_lines() == "24"
+
+
+class TestRunTerminalSize:
+    """Tests for terminal size propagation in run()."""
+
+    @pytest.fixture
+    def runtime(self) -> ContainerRuntime:
+        """Create a docker runtime."""
+        with patch("subprocess.run"):
+            return ContainerRuntime("docker")
+
+    def test_run_passes_columns_and_lines(
+        self, runtime: ContainerRuntime, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """run() includes COLUMNS and LINES env vars in the command."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.setenv("COLUMNS", "160")
+        monkeypatch.setenv("LINES", "48")
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        config = Config()
+
+        with patch("os.execvp") as mock_exec:
+            runtime.run(
+                image="agentbox",
+                workspace=workspace,
+                ro_mounts=[],
+                command=["bash"],
+                config=config,
+            )
+
+            cmd = mock_exec.call_args[0][1]
+            # Find COLUMNS and LINES in the -e arguments
+            env_args = [cmd[i + 1] for i in range(len(cmd) - 1) if cmd[i] == "-e"]
+            assert "COLUMNS=160" in env_args
+            assert "LINES=48" in env_args
+
+    def test_run_uses_fallback_terminal_size(
+        self, runtime: ContainerRuntime, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """run() uses fallback values when no TTY and no env vars."""
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.delenv("COLUMNS", raising=False)
+        monkeypatch.delenv("LINES", raising=False)
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        config = Config()
+
+        with (
+            patch("os.execvp") as mock_exec,
+            patch("os.get_terminal_size", side_effect=OSError),
+        ):
+            runtime.run(
+                image="agentbox",
+                workspace=workspace,
+                ro_mounts=[],
+                command=["bash"],
+                config=config,
+            )
+
+            cmd = mock_exec.call_args[0][1]
+            env_args = [cmd[i + 1] for i in range(len(cmd) - 1) if cmd[i] == "-e"]
+            assert "COLUMNS=80" in env_args
+            assert "LINES=24" in env_args
 
 
 class TestRun:
