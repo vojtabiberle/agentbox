@@ -1,0 +1,9 @@
+name: local
+description: Writable ~/.local mount for tools that install binaries or data (pip --user, etc.)
+priority: 20
+
+mounts:
+  - source: ~/.local
+    target: /home/user/.local
+    readonly: false
+    description: User-local binaries, data, and state

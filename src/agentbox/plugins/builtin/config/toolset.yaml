@@ -1,0 +1,9 @@
+name: config
+description: Writable ~/.config mount for tools that persist configuration files
+priority: 20
+
+mounts:
+  - source: ~/.config
+    target: /home/user/.config
+    readonly: false
+    description: User configuration directory

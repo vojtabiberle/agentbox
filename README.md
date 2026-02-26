@@ -170,6 +170,9 @@ toolsets:
   - go        # Go
   - rust      # Rust via rustup
   - php       # PHP + Composer
+  - cache     # Writable ~/.cache (for Corepack, pip cache, cargo, etc.)
+  - local     # Writable ~/.local (for pip --user, local binaries, etc.)
+  - config    # Writable ~/.config (for tool configuration files)
   - cloud-aws    # AWS CLI
   - cloud-azure  # Azure CLI
   - cloud-gcloud # Google Cloud CLI
@@ -229,6 +232,9 @@ agentbox includes these built-in toolsets:
 | `go` | Go programming language |
 | `rust` | Rust via rustup |
 | `php` | PHP + Composer |
+| `cache` | Writable `~/.cache` mount for package managers and tools |
+| `local` | Writable `~/.local` mount for user-local binaries and data |
+| `config` | Writable `~/.config` mount for tool configuration files |
 | `cloud-aws` | AWS CLI (mounts `~/.aws`) |
 | `cloud-azure` | Azure CLI (mounts `~/.azure`) |
 | `cloud-gcloud` | Google Cloud CLI (mounts `~/.config/gcloud`) |

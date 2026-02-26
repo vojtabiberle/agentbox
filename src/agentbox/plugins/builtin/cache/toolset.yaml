@@ -1,0 +1,9 @@
+name: cache
+description: Writable ~/.cache mount for tools that need cache storage (Corepack, pip, cargo, npm, etc.)
+priority: 20
+
+mounts:
+  - source: ~/.cache
+    target: /home/user/.cache
+    readonly: false
+    description: Shared cache directory for package managers and tools
