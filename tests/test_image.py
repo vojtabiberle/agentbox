@@ -376,3 +376,35 @@ class TestProjectImageTagging:
         # Should pass project tag to build
         call_args = mock_runtime.build.call_args
         assert call_args[0][1].startswith("agentbox:myproject-")
+
+
+class TestProjectPluginDiscovery:
+    """Tests for project-specific plugin discovery in ImageBuilder."""
+
+    def test_project_plugin_discovered_when_workspace_provided(
+        self, mock_runtime: MagicMock, tmp_path: Path
+    ) -> None:
+        """Project plugins are discovered when workspace is passed to ImageBuilder."""
+        # Create a project plugin
+        workspace = tmp_path / "myproject"
+        workspace.mkdir()
+        plugin_dir = workspace / ".agentbox" / "plugins" / "myproject-db"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "toolset.yaml").write_text(
+            "name: myproject-db\n"
+            "description: PostgreSQL client for myproject\n"
+            "depends_on:\n"
+            "  - base\n"
+            "priority: 90\n"
+            "dockerfile: |\n"
+            "  RUN dnf install -y postgresql && dnf clean all\n"
+        )
+
+        config = Config(toolsets=["base", "myproject-db"])
+        builder = ImageBuilder(mock_runtime, config, workspace=workspace)
+
+        # Should be able to load the project plugin
+        loaded = builder.plugin_manager.load(config.toolsets)
+        names = [p.manifest.name for p in loaded]
+        assert "myproject-db" in names
+

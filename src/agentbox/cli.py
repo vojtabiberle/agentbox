@@ -140,7 +140,7 @@ def build(ctx: click.Context, rebuild: bool) -> None:
     config: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
     runtime = ContainerRuntime(config.runtime)
-    builder = ImageBuilder(runtime, config, config_path=config_path)
+    builder = ImageBuilder(runtime, config, workspace=Path.cwd(), config_path=config_path)
 
     image_name = builder.ensure_image(force_rebuild=rebuild)
     console.print(f"[green]Image ready:[/green] {image_name}")

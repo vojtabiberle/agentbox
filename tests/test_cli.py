@@ -320,6 +320,28 @@ class TestBuildCommand:
 
             mock_builder.ensure_image.assert_called_once_with(force_rebuild=True)
 
+    def test_build_passes_workspace_for_project_plugin_discovery(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Build command passes workspace=cwd so project plugins are discovered."""
+        monkeypatch.chdir(tmp_path)
+
+        with patch("agentbox.cli.ContainerRuntime"), \
+             patch("agentbox.cli.ImageBuilder") as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.ensure_image.return_value = "agentbox"
+            mock_builder_cls.return_value = mock_builder
+
+            runner.invoke(main, ["build"])
+
+            # Verify ImageBuilder was called with workspace=cwd
+            call_kwargs = mock_builder_cls.call_args
+            assert "workspace" in call_kwargs[1], "ImageBuilder not called with workspace kwarg"
+            assert call_kwargs[1]["workspace"] == tmp_path
+
 
 class TestConfigCommand:
     """Tests for the config command."""
