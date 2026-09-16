@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Literal
 
 from .config import Config
 from .exceptions import ConfigError, RuntimeNotFoundError
+from .git import GitWorktreeInfo
 from .plugins.models import MountConfig
 
 if TYPE_CHECKING:
@@ -65,6 +66,7 @@ class ContainerRuntime:
         config: Config,
         plugin_manager: PluginManager | None = None,
         agent: Agent | None = None,
+        git_worktree: GitWorktreeInfo | None = None,
     ) -> None:
         """Run a container interactively."""
         # Use host's home path for consistent identity
@@ -99,6 +101,10 @@ class ContainerRuntime:
             "-e",
             f"TERM={os.environ.get('TERM', 'xterm-256color')}",
             "-e",
+            f"COLUMNS={self._get_terminal_columns()}",
+            "-e",
+            f"LINES={self._get_terminal_lines()}",
+            "-e",
             f"HOME={host_home}",
             "-e",
             f"PATH={host_home}/.local/bin:/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
@@ -130,6 +136,7 @@ class ContainerRuntime:
         for i, ro_path in enumerate(ro_mounts):
             cmd.extend(["-v", f"{ro_path}:/mnt/ro{i}{self._vol_suffix('ro')}"])
 
+        self._add_git_mounts(cmd, git_worktree)
         if agent is not None:
             self._add_mounts(cmd, agent.get_mounts(config))
 
@@ -149,6 +156,26 @@ class ContainerRuntime:
         # Replace current process with container
         os.execvp(cmd[0], cmd)
 
+    @staticmethod
+    def _get_terminal_columns() -> str:
+        """Get terminal column count from env or OS, fallback to 80."""
+        if "COLUMNS" in os.environ:
+            return os.environ["COLUMNS"]
+        try:
+            return str(os.get_terminal_size().columns)
+        except (ValueError, OSError):
+            return "80"
+
+    @staticmethod
+    def _get_terminal_lines() -> str:
+        """Get terminal line count from env or OS, fallback to 24."""
+        if "LINES" in os.environ:
+            return os.environ["LINES"]
+        try:
+            return str(os.get_terminal_size().lines)
+        except (ValueError, OSError):
+            return "24"
+
     def _vol_suffix(self, mode: str = "") -> str:
         """Get volume suffix based on runtime. Mode can be 'ro' or 'rw' or empty."""
         if self.runtime == "podman":
@@ -161,6 +188,24 @@ class ContainerRuntime:
             if mode:
                 return f":{mode}"
             return ""
+
+    def _add_git_mounts(self, cmd: list[str], git_worktree: GitWorktreeInfo | None) -> None:
+        """Add mounts for git worktree support.
+
+        Mounts the main repo's .git directory at its original host path
+        so that the .git file's gitdir: reference resolves inside the container.
+        """
+        if git_worktree is None or not git_worktree.needs_mount:
+            return
+
+        rw = self._vol_suffix("rw")
+        common = str(git_worktree.git_common_dir)
+        cmd.extend(["-v", f"{common}:{common}{rw}"])
+
+        # If git_dir is not under common_dir, mount it separately
+        git_dir = str(git_worktree.git_dir)
+        if not git_dir.startswith(common + "/") and git_dir != common:
+            cmd.extend(["-v", f"{git_dir}:{git_dir}{rw}"])
 
     def _add_plugin_mounts(self, cmd: list[str], plugin_manager: PluginManager) -> None:
         """Add mounts from loaded plugins."""

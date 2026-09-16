@@ -1,0 +1,12 @@
+name: ghostty
+description: Ghostty terminal emulator terminfo support (xterm-ghostty)
+priority: 20
+
+dockerfile: |
+  # Ghostty terminfo support
+  # ncurses-term ships the "ghostty" entry; Ghostty sets TERM=xterm-ghostty,
+  # so we create an xterm-ghostty alias via tic.
+  RUN dnf install -y ncurses ncurses-term \
+      && infocmp -x ghostty | sed 's/^ghostty|/xterm-ghostty|/' | tic -x - \
+      && dnf remove -y ncurses \
+      && dnf clean all

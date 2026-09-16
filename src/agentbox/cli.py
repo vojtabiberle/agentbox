@@ -20,6 +20,7 @@ from .config import (
 )
 from .container import ContainerRuntime
 from .exceptions import AgentboxError, ConfigError, PluginError
+from .git import GitWorktreeInfo, detect_worktree
 from .image import ImageBuilder
 from .plugins import PluginManager
 
@@ -68,6 +69,7 @@ def main(ctx: click.Context) -> None:
     help="Read-only directory to mount (can be used multiple times)",
 )
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
+@click.option("--no-git-mount", is_flag=True, help="Disable automatic git worktree mounting")
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -77,6 +79,7 @@ def run(
     agent: str,
     ro: tuple[str, ...],
     rebuild: bool,
+    no_git_mount: bool,
 ) -> None:
     """Run an agent in an isolated container.
 
@@ -112,11 +115,19 @@ def run(
     builder = ImageBuilder(runtime, config, workspace=workspace_path, config_path=config_path)
     image_name = builder.ensure_image(force_rebuild=rebuild)
 
+    # Detect git worktree
+    git_worktree: GitWorktreeInfo | None = None
+    if not no_git_mount:
+        git_worktree = detect_worktree(workspace_path)
+
+    # Get agent configuration
+    agent_instance = get_agent(agent)
+
     # Prepare read-only mounts
     ro_mounts = [Path(p).resolve() for p in ro]
 
     # Print banner
-    _print_banner(workspace_path, ro_mounts, bash, agent)
+    _print_banner(workspace_path, ro_mounts, bash, agent, git_worktree)
 
     # Run container
     if bash:
@@ -132,6 +143,7 @@ def run(
         config=config,
         plugin_manager=builder.plugin_manager,
         agent=agent_instance,
+        git_worktree=git_worktree,
     )
 
 
@@ -452,6 +464,7 @@ def _print_banner(
     ro_mounts: list[Path],
     bash_mode: bool,
     agent: str,
+    git_worktree: GitWorktreeInfo | None = None,
 ) -> None:
     """Print the danger zone banner."""
     W = 60  # inner width
@@ -483,6 +496,12 @@ def _print_banner(
         for mount in ro_mounts:
             m_str = str(mount)[:56]
             console.print(line(f"    [dim]{m_str}[/dim]", 4 + len(m_str)))
+
+    if git_worktree and git_worktree.needs_mount:
+        text = "  [cyan]Git (auto):[/cyan]"
+        console.print(line(text, 13))  # 2 + 11
+        git_str = str(git_worktree.git_common_dir)[:56]
+        console.print(line(f"    {git_str}", 4 + len(git_str)))
 
     console.print(line("", 0))
     text = "  Everything else on your system is [green]isolated[/green]"
