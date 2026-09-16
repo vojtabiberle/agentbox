@@ -120,8 +120,9 @@ Do not duplicate existing mount/environment metadata in a second configuration f
 - Pre-built images for common stacks, with an agreed publishing/update policy.
 - [x] Per-toolset source overrides by declared target in `toolset_mounts`.
 - [x] Explicit read-only MCP configuration sharing through `mcp_mounts`.
-- Additional agents such as Aider and Codex, each with installation, provider
-  setup, isolation and restart verification.
+- [x] Aider and Codex adapters with pinned installations, provider setup docs
+  and real isolated HOME/startup/restart tests. Model validation awaits explicit
+  authorization to pass the existing provider key to these agents.
 - [x] Named concurrent containers through `--name`.
 - [x] Public `--non-interactive` CLI operation with stdin/exit-code preservation
   and explicit `--env NAME` forwarding.

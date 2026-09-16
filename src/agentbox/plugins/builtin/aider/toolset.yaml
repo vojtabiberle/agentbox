@@ -1,0 +1,10 @@
+name: aider
+description: Aider 0.86.2 in a private Python environment
+provides: [aider]
+depends_on: [base]
+priority: 60
+dockerfile: |
+  RUN dnf install -y python3.12 python3-pip && dnf clean all
+  RUN python3.12 -m venv /opt/aider \
+      && /opt/aider/bin/pip install --no-cache-dir aider-chat==0.86.2 \
+      && ln -s /opt/aider/bin/aider /usr/local/bin/aider

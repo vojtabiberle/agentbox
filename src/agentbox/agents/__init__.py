@@ -1,12 +1,16 @@
 """Agent implementations."""
 
 from ..exceptions import UnknownAgentError
+from .aider import AiderAgent
 from .base import Agent
 from .claude import ClaudeAgent
+from .codex import CodexAgent
 from .hermes import HermesAgent
 
 _AGENTS: dict[str, type[Agent]] = {
     "claude": ClaudeAgent,
+    "codex": CodexAgent,
+    "aider": AiderAgent,
     "hermes": HermesAgent,
 }
 
@@ -24,4 +28,12 @@ def list_agents() -> list[str]:
     return list(_AGENTS.keys())
 
 
-__all__ = ["Agent", "ClaudeAgent", "HermesAgent", "get_agent", "list_agents"]
+__all__ = [
+    "Agent",
+    "AiderAgent",
+    "ClaudeAgent",
+    "CodexAgent",
+    "HermesAgent",
+    "get_agent",
+    "list_agents",
+]

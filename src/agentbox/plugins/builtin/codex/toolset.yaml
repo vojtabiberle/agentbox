@@ -1,0 +1,7 @@
+name: codex
+description: OpenAI Codex CLI 0.154.0
+provides: [codex]
+depends_on: [base]
+priority: 60
+dockerfile: |
+  RUN npm install -g @openai/codex@0.154.0

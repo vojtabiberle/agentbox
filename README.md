@@ -683,3 +683,30 @@ toolsets: [terraform, kubernetes-extras]
 
 Offline executable checks can be run with `AGENTBOX_INFRA_TEST_IMAGE` pointing to
 an image containing these toolsets and `pytest tests/test_infrastructure_toolsets.py`.
+
+### Codex and Aider
+
+```bash
+agentbox run --agent codex ~/project
+agentbox run --agent aider ~/project
+```
+
+Codex 0.154.0 and Aider 0.86.2 are installed only when selected. Neither mounts
+host agent credentials or configuration by default; both use the private
+workspace/agent HOME. Log in/configure the provider inside that environment, or
+forward an explicit provider variable for batch use:
+
+```bash
+agentbox run --agent codex --non-interactive --env CODEX_API_KEY ~/project -- exec --model gpt-5.6-sol 'Summarize the project'
+agentbox run --agent aider --non-interactive --env OPENAI_API_KEY ~/project -- --model openai/gpt-5.6-sol --message 'Summarize the project'
+```
+
+For Codex, `CODEX_API_KEY` supports noninteractive execution; see the
+[official automation documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
+Use `codex exec resume --last` to continue a saved session. If nested sandboxing
+is unavailable, Codex's explicit `--dangerously-bypass-approvals-and-sandbox`
+option relies on the agentbox container boundary; agentbox does not add it by
+default. Aider provider options are documented in its
+[usage guide](https://aider.chat/docs/usage.html); its project chat history remains
+in the mounted workspace, and `--restore-chat-history` restores it. Agentbox
+passes agent arguments through without changing model choices or Git behavior.

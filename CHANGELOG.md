@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Codex and Aider adapters with pinned toolsets and isolated HOME.
+
 - Add checksum-pinned Terraform and optional Kubernetes companion toolsets.
 
 - Add per-toolset source overrides and explicit MCP configuration mounts.
