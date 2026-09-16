@@ -1,146 +1,114 @@
 # Roadmap
 
-Implementation plan accepted 2026-09-16.
+Updated 2026-09-16, after [PR #26](https://github.com/vojtabiberle/agentbox/pull/26).
+Completed work is separated by release status. Upcoming milestones are proposed
+in priority order; backlog items are not delivery commitments.
 
-## Current delivery: isolated home and multiple agents
+## Released: v0.2.0
 
-1. [x] Implement the fix for #21: writable, persistent HOME owned by agentbox, isolated per
-   workspace and agent. Do not mount host-wide cache/config/local directories.
-   Supersedes the host-wide sharing approach in PR #22; explicit credential
-   sharing remains available. Remote issue/PR status has not been changed.
-2. [x] Separate Claude installation and mounts from the common runtime; resolve
-   agent toolset dependencies before building; forward CLI arguments.
-3. [x] Add Hermes interactive CLI and setup with a pinned installation and local
-   terminal backend inside the container. Persist its config, sessions and memory.
-4. [x] Verify HOME writes, restart persistence, project/agent isolation, and real
-   Hermes startup. Run regression tests, lint and type checks.
+Published [v0.2.0](https://github.com/vojtabiberle/agentbox/releases/tag/v0.2.0).
+See [CHANGELOG.md](CHANGELOG.md) for migration details and [README.md](README.md)
+for configuration, plugin examples and integration-test commands.
 
-Gateway/bot services and unattended operation remain a later, separate milestone.
-Kubernetes toolset provides kubectl, helm and kustomize; companion tools remain deferred.
+- [x] Private writable HOME and package caches, persistent per workspace and agent.
+  Host-wide cache/config/local directories are not mounted implicitly.
+- [x] Fix [issue #21](https://github.com/vojtabiberle/agentbox/issues/21), now closed.
+  [PR #22](https://github.com/vojtabiberle/agentbox/pull/22) was closed as superseded
+  by [PR #23](https://github.com/vojtabiberle/agentbox/pull/23).
+- [x] Rootless Podman execution with UID mapping and SELinux mount labels.
+- [x] Docker execution as the host UID/GID. Tested with a standard Docker daemon;
+  this does not establish support for a rootless Docker daemon.
+- [x] Claude and Hermes behind a common agent interface: `--agent`, required
+  installation toolsets, explicit host mounts and CLI argument forwarding.
+- [x] Pinned Hermes installation, local terminal backend and persistent
+  configuration, sessions and memory.
+- [x] Explicit Claude host-config sharing and read-only global CLAUDE.md/plugin
+  mounts. These require configuration; host Claude files are not shared by default.
+- [x] Project/global configuration and YAML toolset plugins discovered from
+  `src/agentbox/plugins/builtin/`, `~/.config/agentbox/plugins/` and
+  `<workspace>/.agentbox/plugins/`.
+- [x] Language toolsets: PHP, Go, Python, Node.js and Rust. Cloud toolsets: AWS,
+  Azure and Google Cloud. Docker CLI and minimal Kubernetes tools are available;
+  Kubernetes includes kubectl, helm and kustomize.
+- [x] `agentbox toolsets` lists plugins; `agentbox toolset NAME` shows dependencies,
+  mounts, environment and Dockerfile instructions. A structured inventory of
+  installed tools remains future work.
+- [x] Optional GitHub/cloud credential mounts and SSH-agent forwarding.
+- [x] Current-directory workspace default, additional read-only context mounts,
+  Git worktree metadata mounts, `--bash` and `--rebuild`.
+- [x] Workspace-root `Dockerfile.agentbox` extensions, content-tagged base images
+  and separate project images. The container engine checks COPY/ADD inputs on
+  each project build. Custom files omit `FROM` and use the Fedora base's tools
+  (for example `dnf`, not `apt-get`).
+- [x] Container init process, Python 3.10–3.13 CI and wheel/sdist installation checks.
 
-Validation: rootless Podman builds for Hermes and Claude; Hermes CLI/configuration
-startup; Corepack/Yarn writes and offline cache reuse across container restarts;
-project/agent state isolation. Docker HOME/state integration and project builds have also passed. Claude completed
-an authenticated task and resumed after restart. Hermes model-provider testing
-requires separately configured provider access. See README for the opt-in container tests.
+### Verification completed
 
-## Container Runtime
+- Rootless Podman image builds for Claude and Hermes; Docker project builds.
+- HOME writes, cache reuse after restart and workspace/agent state isolation on
+  Podman and Docker. Corepack/Yarn also passed offline cache reuse after restart.
+- Claude completed an authenticated model task and resumed in a new container.
+- Hermes completed a model task using the requested `openai/gpt-5.6-sol`
+  (provider `openai-api`, model `gpt-5.6-sol`) and recalled the task after restart.
+  Provider access is required for these manual tests; model calls are not in CI.
 
-- [x] Rootless Podman support (with `--userns=keep-id` and SELinux `:Z` labels)
-- [x] Rootless Docker support (with `--user UID:GID`)
+## Completed on main: not yet released
 
-## Configuration
+Merged in [PR #26](https://github.com/vojtabiberle/agentbox/pull/26), commit `ea7b4bd`.
 
-- [x] Config file support (`~/.config/agentbox/config.yaml`)
-- [x] Configurable toolsets — select which dev tools to include:
-  - Language runtimes: PHP, Go, Python, Node.js, Rust
-  - Cloud CLIs: AWS, Azure, Google Cloud
-  - Other tools: Docker CLI
-- [ ] Pre-built image variants for common stacks (e.g., `agentbox:php`, `agentbox:python`)
-- [x] Kubernetes toolset (kubectl, helm, kustomize)
-- [ ] Terraform toolset
+- [x] Load `run` configuration from its target workspace, even when the invoking
+  directory has invalid configuration.
+- [x] Reject dependency cycles and handle repeated toolset dependency names.
+- [x] Separate immutable `RunSpec` preparation, command rendering and execution.
+  The runtime no longer receives configuration, agents or a mutable plugin manager.
+- [x] Support noninteractive runs through the internal run specification.
+  A public noninteractive CLI option is not implemented yet.
+- [x] Validate required mount sources, deduplicate identical mounts and reject
+  conflicting targets. Explicit Claude file/plugin paths must exist.
+- [x] Make hostname and machine-id sharing specific to Claude.
+- [x] Verify 318 tests passing in the default suite (6 optional integration tests
+  skipped), 91% coverage, lint/type checks and CI on Python 3.10–3.13.
+  The two real runtime tests also passed separately on both Podman and Docker.
 
-## Toolsets
+## Next milestones — proposed priority
 
-- [x] `agentbox toolsets` command to list available toolsets with descriptions
-- [ ] Toolset metadata — show what each toolset provides:
-  - Installed packages/tools
-  - Expected mount paths (e.g., `cloud-aws` expects `~/.aws`)
-  - Environment variables set
-- [ ] Configurable paths per toolset in config file (TBD):
-  ```yaml
-  toolsets:
-    cloud-aws:
-      enabled: true
-      credentials_path: ~/.aws  # customizable
-  ```
+### 1. Release the completed fixes
 
-## Credential Sharing
+- [ ] Publish a patch release containing PR #26.
 
-- [x] Mount Azure CLI credentials (`~/.azure`)
-- [x] Mount GitHub CLI credentials (`~/.config/gh`)
-- [x] Mount AWS credentials (`~/.aws`)
-- [x] Mount Google Cloud credentials (`~/.config/gcloud`)
-- [x] SSH agent forwarding for git operations
+Done when: the release version and changelog agree, CI and distribution-install
+checks pass for the release commit, and the tagged release includes wheel/sdist
+artifacts plus notes about workspace configuration and required mount sources.
 
-## Claude Code Integration
+### 2. Verify rootless Docker explicitly
 
-- [x] Support for global CLAUDE.md (auto-mount into container)
-- [x] Support for global skills/plugins directory
-- [ ] Mount MCP server configurations
+- [ ] Test against a rootless Docker daemon and document the supported setup.
 
-## Multiple Agents
+Done when: workspace writes, private HOME ownership, restart persistence and
+project image builds pass against that daemon. If UID mapping needs changes,
+add regression coverage before marking support complete; otherwise document the
+remaining limitation without claiming rootless Docker support.
 
-- [x] Unified interface with `--agent` flag
-- [ ] Aider agent implementation
-- [x] Hermes interactive CLI
-- [ ] Other coding agents (Codex, etc.)
+### 3. Complete toolset inspection
 
-## Workspace Handling
+- [ ] Show `required` and `relabel` mount settings in `agentbox toolset NAME`.
+- [ ] Add a small structured inventory of provided tools to manifests and display it.
 
-- [x] Default to current directory if no workspace specified
-- [x] Read-only directory mounts (`-r` or `--ro` flag) for providing context without write access
-  ```bash
-  agentbox run ~/worktrees/feature -r ~/repos/shared-libs -r ~/docs/api-specs
-  ```
+Done when: built-in inventories match installation instructions, old/custom
+manifests remain compatible, and CLI tests verify tools, mounts and environment.
+Do not duplicate existing mount/environment metadata in a second configuration format.
 
-## Plugin System
+## Backlog — scope and priority not committed
 
-- [x] Toolsets as plugins — externalize toolset definitions:
-  - Each plugin defines:
-    - **Dockerfile fragment**: Commands to install tools/packages
-    - **Runtime configuration**: Mounts, environment variables, etc.
-  - Plugin manifest structure (e.g., `toolset.yaml`):
-    ```yaml
-    name: cloud-aws
-    description: AWS CLI and SDK support
-
-    dockerfile: |
-      RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-          && unzip awscliv2.zip && ./aws/install && rm -rf aws awscliv2.zip
-
-    mounts:
-      - source: ~/.aws
-        target: /home/user/.aws
-        readonly: true
-        description: AWS credentials and config
-
-    environment:
-      AWS_CONFIG_FILE: /home/user/.aws/config
-    ```
-  - Plugin discovery paths:
-    - Built-in: `src/agentbox/plugins/`
-    - User plugins: `~/.config/agentbox/plugins/`
-    - Project plugins: `.agentbox/plugins/`
-  - Benefits:
-    - Users can create/share custom toolsets without forking
-    - Cleaner separation of concerns (no giant Jinja2 template)
-    - Easier to maintain and test individual toolsets
-
-## Project-specific Customization
-
-- [x] `Dockerfile.agentbox` support — when found in project root, extend the base image:
-  - Detects `Dockerfile.agentbox` in workspace root (monorepo subdirectories not supported for now)
-  - Builds a project-specific image combining base toolsets + custom instructions
-  - [x] **Image naming**: Create separate image `agentbox:<project>-<hash>` to avoid polluting base image
-    - Allows per-project caching
-    - Content-tagged base image remains reusable across projects
-  - **Build rules**:
-    - Custom file omits `FROM`; agentbox injects the selected content-tagged base image
-    - Runs after all toolset configuration is applied
-    - Tags change with project instructions/base; engine cache checks COPY/ADD inputs on every build
-    - `--rebuild` flag forces rebuild of both base and project image
-  - Example `Dockerfile.agentbox`:
-    ```dockerfile
-    # Additional project dependencies
-    RUN apt-get update && apt-get install -y postgresql-client
-    RUN pip install specific-package==1.2.3
-    ```
-
-## Quality of Life
-
-- [x] `--rebuild` flag to force image rebuild
-- [x] `--bash` flag to drop into bash instead of agent (for debugging)
-- [x] Persistent package cache in private HOME (per workspace and agent)
-- [ ] Session naming for multiple concurrent containers
-- [ ] `--name` flag for named sessions
+- Terraform toolset and additional Kubernetes companion tools, based on demand.
+- Pre-built images for common stacks, with an agreed publishing/update policy.
+- Per-toolset path overrides in project/global configuration; schema undecided.
+- Explicit MCP configuration sharing.
+- Additional agents such as Aider and Codex, each with installation, provider
+  setup, isolation and restart verification.
+- Named concurrent sessions and a `--name` option.
+- Public noninteractive CLI operation, with defined stdin, exit-code and
+  credential behavior; internal `RunSpec` support is only a prerequisite.
+- Hermes gateway/bot services and unattended operation as a separate milestone,
+  requiring a lifecycle, networking and credential design before implementation.
+- Monorepo subdirectory customization beyond the workspace-root Dockerfile.
