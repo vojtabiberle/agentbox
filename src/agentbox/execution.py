@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,9 @@ class RunSpec:
     interactive: bool = True
     share_hostname: bool = False
     home: Path | None = None
+    name: str | None = None
+    stdin: bool = False
+    forwarded_env: tuple[str, ...] = ()
 
 
 def resolve_mounts(mounts: list[MountConfig]) -> tuple[Mount, ...]:
@@ -75,8 +79,18 @@ def prepare_run(
     agent: Agent | None = None,
     git_worktree: GitWorktreeInfo | None = None,
     interactive: bool = True,
+    name: str | None = None,
+    stdin: bool = False,
+    forwarded_env: tuple[str, ...] = (),
 ) -> RunSpec:
     """Prepare private HOME and validate all mount sources before execution."""
+    if name is not None and not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*", name):
+        raise ConfigError("Invalid container name")
+    for key in forwarded_env:
+        if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", key):
+            raise ConfigError(f"Invalid environment variable name: {key}")
+        if key not in os.environ:
+            raise ConfigError(f"Environment variable is not set: {key}")
     workspace = workspace.resolve()
     host_home = str(Path.home())
     home = state_home(config.state_dir, workspace, agent.name if agent is not None else "shell")
@@ -156,6 +170,9 @@ def prepare_run(
     return RunSpec(
         image=image,
         home=home,
+        name=name,
+        stdin=stdin,
+        forwarded_env=tuple(dict.fromkeys(forwarded_env)),
         command=tuple(command),
         mounts=resolve_mounts(requested),
         environment=tuple(env.items()),

@@ -68,6 +68,10 @@ class ContainerRuntime:
         cmd = [self.runtime, "run", "--rm", "--init"]
         if spec.interactive:
             cmd.append("-it")
+        elif spec.stdin:
+            cmd.append("-i")
+        if spec.name is not None:
+            cmd.extend(["--name", spec.name])
         cmd.extend(["-w", "/workspace"])
         if spec.share_hostname:
             cmd.append("--uts=host")
@@ -88,6 +92,8 @@ class ContainerRuntime:
         }
         for key, value in environment.items():
             cmd.extend(["-e", f"{key}={value}"])
+        for key in spec.forwarded_env:
+            cmd.extend(["-e", key])
         return [*cmd, spec.image, *spec.command]
 
     def is_rootless_docker(self) -> bool:

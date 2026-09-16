@@ -86,6 +86,11 @@ main.add_command(state)
 )
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
 @click.option("--no-git-mount", is_flag=True, help="Disable automatic git worktree mounting")
+@click.option("--name", help="Container name (must be unique among existing containers)")
+@click.option("--non-interactive", is_flag=True, help="Attach stdin without allocating a TTY")
+@click.option(
+    "--env", "forwarded_env", multiple=True, help="Forward a named host environment variable"
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -96,6 +101,9 @@ def run(
     ro: tuple[str, ...],
     rebuild: bool,
     no_git_mount: bool,
+    name: str | None,
+    non_interactive: bool,
+    forwarded_env: tuple[str, ...],
 ) -> None:
     """Run an agent in an isolated container.
 
@@ -151,6 +159,10 @@ def run(
         environment=builder.plugin_manager.get_all_environment(),
         agent=agent_instance,
         git_worktree=git_worktree,
+        name=name,
+        interactive=not non_interactive,
+        stdin=non_interactive,
+        forwarded_env=forwarded_env,
     )
     runtime.run(spec)
 

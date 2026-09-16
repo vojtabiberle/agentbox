@@ -628,3 +628,19 @@ agentbox run --agent hermes ~/new-project
 ```
 
 Restart once more and verify the expected session/config remains available.
+
+### Batch runs and container names
+
+```bash
+printf 'input\n' | agentbox run --bash --non-interactive --name example ~/project -- -c 'read line; echo "$line"'
+agentbox run --agent hermes --non-interactive --env OPENAI_API_KEY ~/project -- chat --provider openai-api --model gpt-5.6-sol --query 'Summarize this project'
+```
+
+`--non-interactive` forwards stdin without a TTY. The container/agent exit status
+is the CLI exit status; stdout/stderr remain attached. Agentbox does not attempt
+interactive provider login in batch mode: configure provider access beforehand.
+`--env NAME` forwards only an explicitly named existing environment variable;
+its value is not embedded in container command arguments. The container runtime
+can still inspect its environment. Named containers must have unique names;
+agentbox never replaces an existing container. Names do not change the per-agent,
+per-workspace state identity. Completed foreground containers are removed.

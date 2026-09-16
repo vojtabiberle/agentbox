@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add named containers, noninteractive stdin and explicit environment forwarding.
+
 - Add provided-tool inventories and required/relabel flags to toolset inspection.
 
 - Add private state inspection/reset commands, scoped leases and active-container checks.

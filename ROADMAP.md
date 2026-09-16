@@ -122,9 +122,9 @@ Do not duplicate existing mount/environment metadata in a second configuration f
 - Explicit MCP configuration sharing.
 - Additional agents such as Aider and Codex, each with installation, provider
   setup, isolation and restart verification.
-- Named concurrent sessions and a `--name` option.
-- Public noninteractive CLI operation, with defined stdin, exit-code and
-  credential behavior; internal `RunSpec` support is only a prerequisite.
+- [x] Named concurrent containers through `--name`.
+- [x] Public `--non-interactive` CLI operation with stdin/exit-code preservation
+  and explicit `--env NAME` forwarding.
 - Hermes gateway/bot services and unattended operation as a separate milestone,
   requiring a lifecycle, networking and credential design before implementation.
 - Monorepo subdirectory customization beyond the workspace-root Dockerfile.

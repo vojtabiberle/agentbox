@@ -127,3 +127,24 @@ def test_state_reset_refuses_running_container(tmp_path):
         subprocess.run([runtime.runtime, "rm", "-f", container_id], check=True, capture_output=True)
     reset_state(spec.home, runtime.runtime)
     assert not spec.home.exists()
+
+
+def test_batch_stdin_exit_code_and_forwarded_env(tmp_path, monkeypatch):
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
+    monkeypatch.setenv("AGENTBOX_SMOKE_VALUE", "forwarded")
+    spec = prepare_run(
+        IMAGE,
+        tmp_path,
+        [],
+        ["bash", "-c", 'read line; printf "%s/%s" "$line" "$AGENTBOX_SMOKE_VALUE"; exit 42'],
+        Config(state_dir=tmp_path / "state"),
+        interactive=False,
+        stdin=True,
+        name=f"agentbox-batch-{os.getpid()}",
+        forwarded_env=("AGENTBOX_SMOKE_VALUE",),
+    )
+    result = subprocess.run(
+        runtime.build_command(spec), input="input\n", text=True, capture_output=True, timeout=60
+    )
+    assert result.returncode == 42
+    assert result.stdout == "input/forwarded"
