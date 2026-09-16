@@ -157,7 +157,7 @@ class PluginManager:
         # Start with plugins that have no dependencies (in_degree == 0)
         # Use a list sorted by priority
         ready = [name for name in needed if in_degree[name] == 0]
-        ready.sort(key=lambda n: self._available[n].manifest.priority)
+        ready.sort(key=lambda n: (self._available[n].manifest.priority, n))
 
         ordered: list[str] = []
 
@@ -172,14 +172,9 @@ class PluginManager:
                 if current in plugin.manifest.depends_on:
                     in_degree[name] -= 1
                     if in_degree[name] == 0:
-                        # Insert into ready list maintaining priority order
-                        priority = self._available[name].manifest.priority
-                        insert_idx = 0
-                        for i, r in enumerate(ready):
-                            if self._available[r].manifest.priority > priority:
-                                break
-                            insert_idx = i + 1
-                        ready.insert(insert_idx, name)
+                        # Stable tie-breaking keeps generated image hashes reproducible.
+                        ready.append(name)
+                        ready.sort(key=lambda n: (self._available[n].manifest.priority, n))
 
         return ordered
 

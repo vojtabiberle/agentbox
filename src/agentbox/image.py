@@ -76,24 +76,25 @@ class ImageBuilder:
     def _compute_image_name(self, dockerfile: str) -> str:
         """Compute the image name, using unique tag for project configs.
 
-        For global config or defaults: <image_name> (e.g., agentbox)
+        For global config or defaults: <image_name>:<hash>
         For project config: <image_name>:<project>-<hash>
         """
+        dockerfile_hash = hashlib.sha256(dockerfile.encode()).hexdigest()[:8]
+        image_base = self.config.image_name
+        if ":" in image_base.rsplit("/", 1)[-1]:
+            image_base = image_base.rsplit(":", 1)[0]
         if not self._is_project_config():
-            return self.config.image_name
+            return f"{image_base}:{dockerfile_hash}"
 
         # Get project name from config file directory
         project_name = self._get_project_name()
-
-        # Compute short hash of dockerfile content
-        dockerfile_hash = hashlib.sha256(dockerfile.encode()).hexdigest()[:8]
 
         # Sanitize project name for docker tag (lowercase, alphanumeric + dash)
         safe_name = re.sub(r"[^a-z0-9-]", "-", project_name.lower())
         safe_name = re.sub(r"-+", "-", safe_name).strip("-")[:20]
 
         # Use config.image_name as base (respects custom image names)
-        return f"{self.config.image_name}:{safe_name}-{dockerfile_hash}"
+        return f"{image_base}:{safe_name}-{dockerfile_hash}"
 
     def _is_project_config(self) -> bool:
         """Check if using a project-level config (not global).

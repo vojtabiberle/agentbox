@@ -1,6 +1,27 @@
 # Roadmap
 
-Future development ideas for agentbox.
+Implementation plan accepted 2026-09-16.
+
+## Current delivery: isolated home and multiple agents
+
+1. [x] Implement the fix for #21: writable, persistent HOME owned by agentbox, isolated per
+   workspace and agent. Do not mount host-wide cache/config/local directories.
+   Supersedes the host-wide sharing approach in PR #22; explicit credential
+   sharing remains available. Remote issue/PR status has not been changed.
+2. [x] Separate Claude installation and mounts from the common runtime; resolve
+   agent toolset dependencies before building; forward CLI arguments.
+3. [x] Add Hermes interactive CLI and setup with a pinned installation and local
+   terminal backend inside the container. Persist its config, sessions and memory.
+4. [x] Verify HOME writes, restart persistence, project/agent isolation, and real
+   Hermes startup. Run regression tests, lint and type checks.
+
+Gateway/bot services and unattended operation remain a later, separate milestone.
+Existing Kubernetes work is independent and must be preserved.
+
+Validation: rootless Podman builds for Hermes and Claude; Hermes CLI/configuration
+startup; Corepack/Yarn writes and offline cache reuse across container restarts;
+project/agent state isolation. Authenticated model calls and Docker integration
+have not been exercised. See README for the opt-in container tests.
 
 ## Container Runtime
 
@@ -19,7 +40,7 @@ Future development ideas for agentbox.
 
 ## Toolsets
 
-- [ ] `agentbox toolsets` command to list available toolsets with descriptions
+- [x] `agentbox toolsets` command to list available toolsets with descriptions
 - [ ] Toolset metadata — show what each toolset provides:
   - Installed packages/tools
   - Expected mount paths (e.g., `cloud-aws` expects `~/.aws`)
@@ -50,6 +71,7 @@ Future development ideas for agentbox.
 
 - [x] Unified interface with `--agent` flag
 - [ ] Aider agent implementation
+- [x] Hermes interactive CLI
 - [ ] Other coding agents (Codex, etc.)
 
 ## Workspace Handling
@@ -62,7 +84,7 @@ Future development ideas for agentbox.
 
 ## Plugin System
 
-- [ ] Toolsets as plugins — externalize toolset definitions:
+- [x] Toolsets as plugins — externalize toolset definitions:
   - Each plugin defines:
     - **Dockerfile fragment**: Commands to install tools/packages
     - **Runtime configuration**: Mounts, environment variables, etc.
@@ -117,6 +139,6 @@ Future development ideas for agentbox.
 
 - [x] `--rebuild` flag to force image rebuild
 - [x] `--bash` flag to drop into bash instead of agent (for debugging)
-- [ ] Persistent package cache volume (npm, pip, etc.)
+- [x] Persistent package cache in private HOME (per workspace and agent)
 - [ ] Session naming for multiple concurrent containers
 - [ ] `--name` flag for named sessions

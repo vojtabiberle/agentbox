@@ -61,10 +61,10 @@ class TestClaudeAgent:
         assert "Claude" in agent.description
 
     def test_claude_agent_required_toolsets(self) -> None:
-        """Claude agent requires base toolset."""
+        """Claude agent requires its own installation toolset."""
         agent = ClaudeAgent()
         toolsets = agent.get_required_toolsets()
-        assert "base" in toolsets
+        assert "claude" in toolsets
 
     def test_claude_agent_required_toolsets_returns_list(self) -> None:
         """get_required_toolsets returns a list."""

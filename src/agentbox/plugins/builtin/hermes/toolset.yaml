@@ -1,0 +1,18 @@
+name: hermes
+description: Hermes Agent interactive CLI (pinned source revision)
+depends_on: [base]
+priority: 60
+dockerfile: |
+  RUN dnf install -y python3.13 python3-pip && dnf clean all
+  RUN pip install --no-cache-dir uv==0.11.6
+  RUN git init /opt/hermes \
+      && cd /opt/hermes \
+      && git remote add origin https://github.com/NousResearch/hermes-agent.git \
+      && git fetch --depth=1 origin 4716ec0ba4e212105f8f162c226f052b25f8a76b \
+      && git checkout --detach FETCH_HEAD \
+      && uv sync --frozen --no-dev --python python3.13 \
+      && ln -s /opt/hermes/.venv/bin/hermes /usr/local/bin/hermes
+environment:
+  HERMES_HOME: /home/user/.hermes
+  TERMINAL_ENV: local
+  TERMINAL_CWD: /workspace

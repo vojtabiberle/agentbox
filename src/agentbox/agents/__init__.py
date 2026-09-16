@@ -3,9 +3,11 @@
 from ..exceptions import UnknownAgentError
 from .base import Agent
 from .claude import ClaudeAgent
+from .hermes import HermesAgent
 
 _AGENTS: dict[str, type[Agent]] = {
     "claude": ClaudeAgent,
+    "hermes": HermesAgent,
 }
 
 
@@ -22,4 +24,4 @@ def list_agents() -> list[str]:
     return list(_AGENTS.keys())
 
 
-__all__ = ["Agent", "ClaudeAgent", "get_agent", "list_agents"]
+__all__ = ["Agent", "ClaudeAgent", "HermesAgent", "get_agent", "list_agents"]

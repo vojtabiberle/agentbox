@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 import sys
@@ -9,9 +10,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from .config import Config
-from .exceptions import RuntimeNotFoundError
+from .exceptions import ConfigError, RuntimeNotFoundError
+from .plugins.models import MountConfig
 
 if TYPE_CHECKING:
+    from .agents.base import Agent
     from .plugins import PluginManager
 
 
@@ -61,10 +64,24 @@ class ContainerRuntime:
         command: list[str],
         config: Config,
         plugin_manager: PluginManager | None = None,
+        agent: Agent | None = None,
     ) -> None:
         """Run a container interactively."""
         # Use host's home path for consistent identity
         host_home = str(Path.home())
+
+        # Only this directory is mounted as HOME; host HOME stays private.
+        workspace_id = hashlib.sha256(str(workspace.resolve()).encode()).hexdigest()[:16]
+        home = (
+            config.state_dir.expanduser().resolve()
+            / workspace_id
+            / (agent.name if agent is not None else "shell")
+            / "home"
+        )
+        try:
+            home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError as err:
+            raise ConfigError(f"Cannot create container HOME {home}: {err}") from err
 
         # Build command
         cmd = [
@@ -74,6 +91,8 @@ class ContainerRuntime:
             "--rm",
             "-v",
             f"{workspace}:/workspace{self._vol_suffix()}",
+            "-v",
+            f"{home}:{host_home}{self._vol_suffix('rw')}",
             "-w",
             "/workspace",
             "--uts=host",  # Share UTS namespace (hostname) with host
@@ -82,7 +101,7 @@ class ContainerRuntime:
             "-e",
             f"HOME={host_home}",
             "-e",
-            f"PATH=/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
+            f"PATH={host_home}/.local/bin:/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
         ]
 
         # Mount host machine-id for consistent identity (needed for Claude statsig cache)
@@ -111,8 +130,8 @@ class ContainerRuntime:
         for i, ro_path in enumerate(ro_mounts):
             cmd.extend(["-v", f"{ro_path}:/mnt/ro{i}{self._vol_suffix('ro')}"])
 
-        # Add Claude config mount
-        self._add_claude_mounts(cmd, config)
+        if agent is not None:
+            self._add_mounts(cmd, agent.get_mounts(config))
 
         # Add plugin mounts and environment (new system)
         if plugin_manager is not None:
@@ -145,9 +164,12 @@ class ContainerRuntime:
 
     def _add_plugin_mounts(self, cmd: list[str], plugin_manager: PluginManager) -> None:
         """Add mounts from loaded plugins."""
+        self._add_mounts(cmd, plugin_manager.get_all_mounts())
+
+    def _add_mounts(self, cmd: list[str], mounts: list[MountConfig]) -> None:
         host_home = Path.home()
 
-        for mount in plugin_manager.get_all_mounts():
+        for mount in mounts:
             # Expand ~ in source path
             source = Path(mount.source).expanduser()
 
@@ -227,29 +249,3 @@ class ContainerRuntime:
             if ssh_sock and Path(ssh_sock).exists():
                 cmd.extend(["-v", f"{ssh_sock}:{ssh_sock}"])
                 cmd.extend(["-e", f"SSH_AUTH_SOCK={ssh_sock}"])
-
-    def _add_claude_mounts(self, cmd: list[str], config: Config) -> None:
-        """Add Claude config mounts."""
-        host_home = Path.home()
-        claude_dir = host_home / ".claude"
-        claude_json = host_home / ".claude.json"
-        rw = self._vol_suffix("rw")
-        ro = self._vol_suffix("ro")
-
-        if claude_dir.exists():
-            cmd.extend(["-v", f"{claude_dir}:{host_home}/.claude{rw}"])
-
-        # Claude also uses ~/.claude.json directly in home (separate from ~/.claude/.claude.json)
-        if claude_json.exists():
-            cmd.extend(["-v", f"{claude_json}:{host_home}/.claude.json{rw}"])
-
-        # Additional mounts (override files in .claude)
-        claude_config = config.claude
-
-        if claude_config.global_claude_md and claude_config.global_claude_md.exists():
-            cmd.extend(
-                ["-v", f"{claude_config.global_claude_md}:{host_home}/.claude/CLAUDE.md{ro}"]
-            )
-
-        if claude_config.plugins_dir and claude_config.plugins_dir.exists():
-            cmd.extend(["-v", f"{claude_config.plugins_dir}:{host_home}/.claude/plugins{ro}"])

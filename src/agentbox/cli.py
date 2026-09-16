@@ -57,6 +57,7 @@ def main(ctx: click.Context) -> None:
 
 @main.command()
 @click.argument("workspace", type=click.Path(), default=".")
+@click.argument("agent_args", nargs=-1, type=click.UNPROCESSED)
 @click.option("--bash", is_flag=True, help="Run bash instead of agent (for debugging)")
 @click.option("--agent", "-a", default="claude", help="Agent to run (default: claude)")
 @click.option(
@@ -71,6 +72,7 @@ def main(ctx: click.Context) -> None:
 def run(
     ctx: click.Context,
     workspace: str,
+    agent_args: tuple[str, ...],
     bash: bool,
     agent: str,
     ro: tuple[str, ...],
@@ -90,6 +92,18 @@ def run(
         workspace_path.mkdir(parents=True)
         console.print(f"[green]Created:[/green] {workspace_path}")
 
+    agent_instance = get_agent(agent)
+    config = config.model_copy(
+        update={
+            "toolsets": list(
+                dict.fromkeys(config.toolsets + agent_instance.get_required_toolsets())
+            )
+        }
+    )
+
+    if not workspace_path.is_dir():
+        raise click.BadParameter("Workspace must be a directory", param_hint="workspace")
+
     # Initialize container runtime
     runtime = ContainerRuntime(config.runtime)
 
@@ -97,9 +111,6 @@ def run(
     config_path: Path | None = ctx.obj["config_path"]
     builder = ImageBuilder(runtime, config, workspace=workspace_path, config_path=config_path)
     image_name = builder.ensure_image(force_rebuild=rebuild)
-
-    # Get agent configuration
-    agent_instance = get_agent(agent)
 
     # Prepare read-only mounts
     ro_mounts = [Path(p).resolve() for p in ro]
@@ -109,9 +120,9 @@ def run(
 
     # Run container
     if bash:
-        cmd = ["bash"]
+        cmd = ["bash", *agent_args]
     else:
-        cmd = agent_instance.get_command()
+        cmd = [*agent_instance.get_command(), *agent_args]
 
     runtime.run(
         image=image_name,
@@ -120,18 +131,28 @@ def run(
         command=cmd,
         config=config,
         plugin_manager=builder.plugin_manager,
+        agent=agent_instance,
     )
 
 
 @main.command()
 @click.option("--rebuild", is_flag=True, help="Force rebuild even if image exists")
+@click.option("--agent", "-a", default="claude", help="Agent to install (default: claude)")
 @click.pass_context
-def build(ctx: click.Context, rebuild: bool) -> None:
+def build(ctx: click.Context, rebuild: bool, agent: str) -> None:
     """Build the container image."""
     config: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
+    agent_instance = get_agent(agent)
+    config = config.model_copy(
+        update={
+            "toolsets": list(
+                dict.fromkeys(config.toolsets + agent_instance.get_required_toolsets())
+            )
+        }
+    )
     runtime = ContainerRuntime(config.runtime)
-    builder = ImageBuilder(runtime, config, config_path=config_path)
+    builder = ImageBuilder(runtime, config, workspace=Path.cwd(), config_path=config_path)
 
     image_name = builder.ensure_image(force_rebuild=rebuild)
     console.print(f"[green]Image ready:[/green] {image_name}")
@@ -176,6 +197,7 @@ def config_show(ctx: click.Context) -> None:
     console.print()
     console.print(f"[cyan]Runtime:[/cyan]    {cfg.runtime}")
     console.print(f"[cyan]Image:[/cyan]      {cfg.image_name}")
+    console.print(f"[cyan]State:[/cyan]      {cfg.state_dir.expanduser()}")
 
     # Get all available toolsets (include cwd for project plugin discovery)
     plugin_manager = PluginManager(Path.cwd())

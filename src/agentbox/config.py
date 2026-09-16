@@ -22,6 +22,7 @@ class CredentialsConfig(BaseModel):
 class ClaudeConfig(BaseModel):
     """Claude-specific configuration."""
 
+    share_host_config: bool = False
     global_claude_md: Path | None = None
     plugins_dir: Path | None = None
 
@@ -34,6 +35,7 @@ class Config(BaseModel):
     credentials: CredentialsConfig = Field(default_factory=CredentialsConfig)
     claude: ClaudeConfig = Field(default_factory=ClaudeConfig)
     image_name: str = "agentbox"
+    state_dir: Path = Field(default_factory=lambda: Path.home() / ".local/state/agentbox")
 
 
 def get_config_paths() -> list[Path]:
@@ -118,6 +120,7 @@ toolsets:
 
 # Project-specific Claude settings
 # claude:
+#   share_host_config: false  # true shares host Claude state read-write
 #   global_claude_md: ~/dotfiles/CLAUDE.md
 #   plugins_dir: ./.agentbox/plugins
 """
@@ -128,6 +131,9 @@ toolsets:
 
 # Container runtime: podman or docker
 runtime: podman
+
+# Private persistent HOME, scoped by workspace and agent
+state_dir: ~/.local/state/agentbox
 
 # Default toolsets to include in the container image
 # Available: base, php, python, go, rust, node, cloud-aws, cloud-azure, cloud-gcloud
@@ -144,6 +150,7 @@ credentials:
 
 # Claude-specific settings
 # claude:
+#   share_host_config: false  # true shares host Claude state read-write
 #   global_claude_md: ~/dotfiles/CLAUDE.md
 #   plugins_dir: ~/dotfiles/claude-plugins
 """

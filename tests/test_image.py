@@ -51,7 +51,7 @@ class TestEnsureImage:
         builder = ImageBuilder(mock_runtime, config)
         result = builder.ensure_image()
 
-        assert result == "test-image"
+        assert result.startswith("test-image:")
         mock_runtime.build.assert_not_called()
 
     def test_ensure_image_builds_when_missing(self, mock_runtime: MagicMock) -> None:
@@ -62,7 +62,7 @@ class TestEnsureImage:
         builder = ImageBuilder(mock_runtime, config)
         result = builder.ensure_image()
 
-        assert result == "test-image"
+        assert result.startswith("test-image:")
         mock_runtime.build.assert_called_once()
 
     def test_ensure_image_force_rebuild(self, mock_runtime: MagicMock) -> None:
@@ -73,7 +73,7 @@ class TestEnsureImage:
         builder = ImageBuilder(mock_runtime, config)
         result = builder.ensure_image(force_rebuild=True)
 
-        assert result == "test-image"
+        assert result.startswith("test-image:")
         mock_runtime.build.assert_called_once()
 
     def test_ensure_image_passes_correct_tag(self, mock_runtime: MagicMock) -> None:
@@ -85,7 +85,7 @@ class TestEnsureImage:
         builder.ensure_image()
 
         call_args = mock_runtime.build.call_args
-        assert call_args[0][1] == "custom-image"
+        assert call_args[0][1].startswith("custom-image:")
 
 
 class TestRenderDockerfile:
@@ -234,30 +234,30 @@ class TestProjectImageTagging:
     def test_compute_image_name_uses_default_for_no_project_config(
         self, mock_runtime: MagicMock
     ) -> None:
-        """_compute_image_name returns default image name when no project config."""
+        """_compute_image_name returns content tag when no project config."""
         config = Config(image_name="agentbox")
         builder = ImageBuilder(mock_runtime, config, config_path=None)
 
         result = builder._compute_image_name("FROM ubuntu")
 
-        assert result == "agentbox"
+        assert result == "agentbox:952b10c1"
 
     def test_compute_image_name_uses_default_for_global_config(
         self, mock_runtime: MagicMock, tmp_path: Path
     ) -> None:
-        """_compute_image_name returns default image name for global config."""
+        """_compute_image_name returns content tag for global config."""
         config = Config(image_name="agentbox")
         global_config = tmp_path / ".config" / "agentbox" / "config.yaml"
         builder = ImageBuilder(mock_runtime, config, config_path=global_config)
 
         result = builder._compute_image_name("FROM ubuntu")
 
-        assert result == "agentbox"
+        assert result == "agentbox:952b10c1"
 
     def test_compute_image_name_uses_default_for_home_agentbox_yaml(
         self, mock_runtime: MagicMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """_compute_image_name returns default for ~/.agentbox.yaml."""
+        """_compute_image_name returns content tag for ~/.agentbox.yaml."""
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         config = Config(image_name="agentbox")
@@ -266,8 +266,8 @@ class TestProjectImageTagging:
 
         result = builder._compute_image_name("FROM ubuntu")
 
-        # Should use default, not project tag
-        assert result == "agentbox"
+        # Should use a content tag without a project prefix
+        assert result == "agentbox:952b10c1"
 
     def test_compute_image_name_creates_unique_tag_for_project_config(
         self, mock_runtime: MagicMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

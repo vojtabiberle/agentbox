@@ -1,0 +1,6 @@
+name: claude
+description: Claude Code CLI
+depends_on: [base]
+priority: 60
+dockerfile: |
+  RUN npm install -g @anthropic-ai/claude-code

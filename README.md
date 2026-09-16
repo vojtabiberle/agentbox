@@ -83,7 +83,7 @@ agentbox run ~/workspace --rebuild
 ### CLI Reference
 
 ```
-agentbox run [OPTIONS] [WORKSPACE]
+agentbox run [OPTIONS] [WORKSPACE] [-- AGENT_ARGS...]
 
 Arguments:
   WORKSPACE   Directory to mount read-write (default: current directory)
@@ -94,7 +94,7 @@ Options:
   --ro, -r PATH     Read-only directory to mount (repeatable)
   --rebuild         Force rebuild the container image
 
-agentbox build [--rebuild]   Build the container image
+agentbox build [--agent NAME] [--rebuild]   Build the container image
 
 agentbox config              Show current configuration
 agentbox config show         Show current configuration (same as above)
@@ -106,6 +106,53 @@ agentbox toolset <name>      Show details about a specific toolset
 
 agentbox upgrade             Upgrade agentbox (if installed via install.sh)
 ```
+
+### Agents and persistent HOME
+
+```bash
+# First-time Hermes setup, then interactive chat in the same workspace
+agentbox run --agent hermes ~/workspace -- setup
+agentbox run --agent hermes ~/workspace
+
+# Forward options verbatim to the selected agent
+agentbox run --agent hermes ~/workspace -- --help
+agentbox build --agent hermes
+```
+
+Agent installation toolsets are included automatically. Hermes uses its local
+terminal backend **inside** the agentbox container; no host container socket is
+mounted. Hermes source is pinned in its toolset manifest and installed with its
+upstream lockfile. Upgrade by changing the pin and rebuilding the image.
+
+Every workspace/agent pair gets a writable HOME at
+`~/.local/state/agentbox/<workspace-path-hash>/<agent>/home` on the host. Config,
+cache, sessions, skills and memory persist across runs and image rebuilds. The
+container HOME keeps the host home **path**, but its contents come from this private
+directory. The host's actual home directories are not shared automatically.
+Workspaces are identified by their resolved absolute path: moving a project starts
+with new state. Different agents and worktrees have separate state and logins.
+Concurrent runs of the same agent in the same workspace share that state.
+
+Optional configuration:
+
+```yaml
+state_dir: ~/.local/state/agentbox
+claude:
+  share_host_config: false
+```
+
+**Migration:** Claude no longer automatically mounts host `~/.claude` and
+`~/.claude.json`. Log in within the container, or explicitly set
+`claude.share_host_config: true` to reuse the old behavior. That option exposes
+those host files read-write and shares Claude state across workspaces. Explicit
+`global_claude_md` and `plugins_dir` mounts remain read-only. Hermes starts with
+fresh state; run its setup command instead of importing host secrets implicitly.
+
+Cache/HOME writes work without the host-wide mounts proposed in PR #22. Existing
+credential options and plugin mounts still opt into host sharing. Private state
+contains secrets: back it up accordingly. To reset a workspace/agent, stop its
+containers and delete only its corresponding state directory; this removes its
+login, history and user-installed tools.
 
 ### Recommended: Git Worktree Workflow
 
@@ -209,10 +256,12 @@ credentials:
 
 agentbox automatically tags container images based on your configuration:
 
-- **Global config**: Uses default image name (`agentbox:latest`)
-- **Project config**: Uses unique tag based on project name and config hash (`agentbox:myproject-a1b2c3d4`)
+- **Global config**: Uses a hash of the rendered Dockerfile (`agentbox:a1b2c3d4`)
+- **Project config**: Uses unique tag based on project name and rendered Dockerfile hash (`agentbox:myproject-a1b2c3d4`)
 
-This allows multiple projects with different toolsets to coexist without rebuilding images.
+Changing the selected agent or toolsets selects a different image when the generated
+Dockerfile changes. Existing matching images are reused. `image_name` supplies the
+repository name; any explicit tag is replaced by the generated tag.
 
 ## Toolsets
 
@@ -224,7 +273,9 @@ agentbox includes these built-in toolsets:
 
 | Toolset | Description |
 |---------|-------------|
-| `base` | Git, Node.js, ripgrep, fd, bat, fzf, jq, yq, gh, Claude Code |
+| `base` | Git, Node.js, ripgrep, fd, bat, fzf, jq, yq, gh |
+| `claude` | Claude Code CLI (automatically selected for Claude) |
+| `hermes` | Hermes CLI, pinned source revision and locked Python dependencies |
 | `python` | Python 3 + pip |
 | `go` | Go programming language |
 | `rust` | Rust via rustup |
@@ -339,8 +390,8 @@ environment:
 
 ## How it works
 
-- **Workspace isolation**: Only the specified directory is mounted at `/workspace`
-- **Claude credentials**: `~/.claude` mounted read-write (shared with host)
+- **Workspace isolation**: The selected directory is mounted at `/workspace`; agentbox also mounts its private persistent HOME and explicitly configured mounts.
+- **Agent state**: Private HOME per workspace and agent. Host Claude configuration is shared only with `claude.share_host_config: true`.
 - **Rootless security**: Runs with `--userns=keep-id` and `--security-opt=no-new-privileges`
 - **No network restrictions**: Full network access for package installation and API calls
 
@@ -348,7 +399,8 @@ environment:
 
 - No access to host Docker/Podman socket (can't run containers inside)
 - No GPU access
-- Container is ephemeral — installed packages are lost between runs (workspace files persist)
+- Container is ephemeral — system package changes are lost between runs. Workspace files and private HOME (including user-local packages and cache) persist.
+- Hermes integration currently targets interactive CLI/setup; gateway services are not managed.
 
 ## Local Development
 
@@ -404,6 +456,20 @@ pytest tests/test_config.py
 # Run with verbose output
 pytest -v
 ```
+
+### Real-container regression test
+
+Build a Hermes image, then use the image name printed by the build:
+
+```bash
+agentbox build --agent hermes
+AGENTBOX_TEST_IMAGE=localhost/agentbox:<printed-tag> pytest -q tests/test_runtime_integration.py
+```
+
+This opt-in test uses rootless Podman and temporary state. It verifies HOME/cache
+writes, Hermes CLI/configuration startup, persistence after container restart,
+and separation across agents and workspaces. It also downloads Corepack/Yarn and
+checks offline cache reuse after restart. It makes no paid model calls.
 
 ### Code Quality
 
