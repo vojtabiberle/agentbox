@@ -439,6 +439,9 @@ def toolset(name: str, workspace: str | None) -> None:
     console.print(f"[cyan]Priority:[/cyan] {manifest.priority}")
     console.print(f"[cyan]Path:[/cyan]     {plugin.source_path}")
 
+    if manifest.provides:
+        console.print("[cyan]Provides:[/cyan] " + ", ".join(manifest.provides))
+
     if manifest.depends_on:
         console.print()
         console.print("[cyan]Dependencies:[/cyan]")
@@ -450,7 +453,10 @@ def toolset(name: str, workspace: str | None) -> None:
         console.print("[cyan]Mounts:[/cyan]")
         for mount in manifest.mounts:
             ro_flag = "[dim](ro)[/dim]" if mount.readonly else "[yellow](rw)[/yellow]"
-            console.print(f"  {mount.source} → {mount.target} {ro_flag}")
+            console.print(
+                f"  {mount.source} → {mount.target} {ro_flag} "
+                f"required={str(mount.required).lower()} relabel={str(mount.relabel).lower()}"
+            )
             if mount.description:
                 console.print(f"    [dim]{mount.description}[/dim]")
 

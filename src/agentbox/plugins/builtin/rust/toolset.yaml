@@ -1,4 +1,5 @@
 name: rust
+provides: ["rustup"]
 description: Rust development environment with rustup
 depends_on:
   - base

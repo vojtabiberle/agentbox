@@ -1,4 +1,5 @@
 name: go
+provides: ["go", "gofmt"]
 description: Go development environment
 depends_on:
   - base

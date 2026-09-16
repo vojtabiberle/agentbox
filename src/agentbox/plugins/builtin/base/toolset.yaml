@@ -1,4 +1,5 @@
 name: base
+provides: ["git", "git-lfs", "tmux", "htop", "vim", "rg", "fd", "bat", "fzf", "jq", "yq", "ssh", "keychain", "gh", "node", "npm"]
 description: Base development tools and Node.js
 priority: 10
 

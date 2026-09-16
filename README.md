@@ -376,6 +376,7 @@ depends_on:
 
 # Optional: priority for ordering (lower = earlier, default: 50)
 priority: 50
+provides: [some-tool]  # Optional inventory; dependencies list their own tools
 
 # Optional: Dockerfile fragment (RUN commands to install packages)
 dockerfile: |

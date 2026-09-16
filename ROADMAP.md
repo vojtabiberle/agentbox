@@ -107,8 +107,8 @@ untouched. Tests must cover scope isolation and active-container refusal.
 
 ### 4. Complete toolset inspection
 
-- [ ] Show `required` and `relabel` mount settings in `agentbox toolset NAME`.
-- [ ] Add a small structured inventory of provided tools to manifests and display it.
+- [x] Show `required` and `relabel` mount settings in `agentbox toolset NAME`.
+- [x] Add a small structured inventory of provided tools to manifests and display it.
 
 Done when: built-in inventories match installation instructions, old/custom
 manifests remain compatible, and CLI tests verify tools, mounts and environment.

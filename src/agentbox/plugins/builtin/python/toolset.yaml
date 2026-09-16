@@ -1,4 +1,5 @@
 name: python
+provides: ["python3", "pip3"]
 description: Python 3 development environment
 depends_on:
   - base

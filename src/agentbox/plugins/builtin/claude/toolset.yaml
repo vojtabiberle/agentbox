@@ -1,4 +1,5 @@
 name: claude
+provides: ["claude"]
 description: Claude Code CLI
 depends_on: [base]
 priority: 60

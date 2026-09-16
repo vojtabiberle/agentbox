@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add provided-tool inventories and required/relabel flags to toolset inspection.
+
 - Add private state inspection/reset commands, scoped leases and active-container checks.
 - Document private state backup/restore and workspace migration.
 

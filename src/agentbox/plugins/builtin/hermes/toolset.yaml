@@ -1,4 +1,5 @@
 name: hermes
+provides: ["hermes", "uv"]
 description: Hermes Agent interactive CLI (pinned source revision)
 depends_on: [base]
 priority: 60

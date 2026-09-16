@@ -1,4 +1,5 @@
 name: cloud-gcloud
+provides: ["gcloud"]
 description: Google Cloud CLI support
 depends_on:
   - base

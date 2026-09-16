@@ -1,4 +1,5 @@
 name: cloud-azure
+provides: ["az"]
 description: Azure CLI support
 depends_on:
   - base

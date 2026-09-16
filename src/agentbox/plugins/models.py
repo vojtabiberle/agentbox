@@ -27,6 +27,7 @@ class ToolsetManifest(BaseModel):
 
     name: str = Field(description="Unique toolset identifier")
     description: str = Field(default="", description="Human-readable description")
+    provides: list[str] = Field(default_factory=list, description="Installed tools or resources")
     dockerfile: str | None = Field(default=None, description="Dockerfile fragment to include")
     mounts: list[MountConfig] = Field(default_factory=list, description="Container mounts to add")
     environment: dict[str, str] = Field(

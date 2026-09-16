@@ -1,4 +1,5 @@
 name: docker
+provides: ["docker"]
 description: Docker CLI for interacting with host Docker socket
 depends_on:
   - base

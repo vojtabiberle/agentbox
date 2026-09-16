@@ -1,4 +1,5 @@
 name: php
+provides: ["php", "composer"]
 description: PHP development environment with Composer
 depends_on:
   - base

@@ -1,4 +1,5 @@
 name: kubernetes
+provides: ["kubectl", "helm", "kustomize"]
 description: Kubernetes CLI tools (kubectl, helm, kustomize)
 depends_on: [base]
 priority: 50

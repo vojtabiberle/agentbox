@@ -1,4 +1,5 @@
 name: ghostty
+provides: ["xterm-ghostty terminfo"]
 description: Ghostty terminal emulator terminfo support (xterm-ghostty)
 priority: 20
 
