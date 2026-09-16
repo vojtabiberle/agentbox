@@ -95,7 +95,7 @@ class ImageBuilder:
         )
         digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
         project = re.sub(r"[^a-z0-9-]", "-", self.workspace.name.lower()).strip("-")[:20]
-        local_base = self.config.image_name if self.config.prebuilt_image else image_name
+        local_base = self._compute_image_name("") if self.config.prebuilt_image else image_name
         project_image = f"{local_base.rsplit(':', 1)[0]}:{project or 'project'}-{digest}"
         console.print(f"[cyan]Building project image {project_image}...[/cyan]")
         # Let the engine evaluate COPY/ADD inputs and .dockerignore on every run.

@@ -27,10 +27,10 @@ def test_digest_reference_can_be_extended_without_invalid_local_tag(tmp_path):
     (tmp_path / 'Dockerfile.agentbox').write_text('RUN true')
     runtime = MagicMock()
     runtime.image_id.return_value = 'sha256:' + 'a' * 64
-    config = Config(prebuilt_image='ghcr.io/example/image@sha256:' + 'b' * 64)
+    config = Config(prebuilt_image='ghcr.io/example/image@sha256:' + 'b' * 64, image_name='localhost:5000/agentbox')
     builder = ImageBuilder(runtime, config, workspace=tmp_path)
     first = builder.ensure_image()
-    assert first.startswith('agentbox:')
+    assert first.startswith('localhost:5000/agentbox:')
     assert runtime.build.call_args.args[0].startswith('FROM ghcr.io/example/image@sha256:')
     runtime.image_id.return_value = 'sha256:' + 'c' * 64
     assert builder.ensure_image() != first
