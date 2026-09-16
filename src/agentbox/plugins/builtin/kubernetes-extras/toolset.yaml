@@ -1,0 +1,25 @@
+name: kubernetes-extras
+description: Optional kubectx, kubens and stern (checksum-pinned)
+provides: [kubectx, kubens, stern]
+depends_on: [kubernetes]
+priority: 55
+dockerfile: |
+  RUN dnf install -y tar gzip && dnf clean all
+  RUN set -eu; case "$(uname -m)" in x86_64) arch=x86_64; checksum=91ac5ef510763cfa78953bd377c90c68cb1f8c30eb2a5ec46196cc72e8c0aa09 ;; aarch64) arch=arm64; checksum=2d2fc0a2f34908f8f34ed6db5d83ad8b221d493836671d07cac27003168d34ce ;; *) exit 1 ;; esac; \
+      curl -fsSL "https://github.com/ahmetb/kubectx/releases/download/v0.10.2/kubectx_v0.10.2_linux_${arch}.tar.gz" -o /tmp/tool.tar.gz; \
+      printf '%s  %s\n' "$checksum" /tmp/tool.tar.gz | sha256sum -c -; \
+      mkdir /tmp/tool; tar -xzf /tmp/tool.tar.gz -C /tmp/tool; \
+      install -m 755 /tmp/tool/kubectx /usr/local/bin/kubectx; \
+      rm -rf /tmp/tool /tmp/tool.tar.gz
+  RUN set -eu; case "$(uname -m)" in x86_64) arch=x86_64; checksum=1cc96c6a6b1f7fb0b36964b92e5953d1f79b0bcbe6e998a800ce84ed82fe9aca ;; aarch64) arch=arm64; checksum=908b1f974f7dc13e6745276dde52ae2e9216d8d014d4621774407d557a12bb09 ;; *) exit 1 ;; esac; \
+      curl -fsSL "https://github.com/ahmetb/kubectx/releases/download/v0.10.2/kubens_v0.10.2_linux_${arch}.tar.gz" -o /tmp/tool.tar.gz; \
+      printf '%s  %s\n' "$checksum" /tmp/tool.tar.gz | sha256sum -c -; \
+      mkdir /tmp/tool; tar -xzf /tmp/tool.tar.gz -C /tmp/tool; \
+      install -m 755 /tmp/tool/kubens /usr/local/bin/kubens; \
+      rm -rf /tmp/tool /tmp/tool.tar.gz
+  RUN set -eu; case "$(uname -m)" in x86_64) arch=amd64; checksum=7754adfa653939240f7d20fff4ada9b69cda40c9e70732301f67bb8045f1ef3e ;; aarch64) arch=arm64; checksum=e215cfc5e42d71e93b77d3fac8f0df7d736271f44b2d92a5b417eaa588edff3a ;; *) exit 1 ;; esac; \
+      curl -fsSL "https://github.com/stern/stern/releases/download/v1.34.0/stern_1.34.0_linux_${arch}.tar.gz" -o /tmp/tool.tar.gz; \
+      printf '%s  %s\n' "$checksum" /tmp/tool.tar.gz | sha256sum -c -; \
+      mkdir /tmp/tool; tar -xzf /tmp/tool.tar.gz -C /tmp/tool; \
+      install -m 755 /tmp/tool/stern /usr/local/bin/stern; \
+      rm -rf /tmp/tool /tmp/tool.tar.gz

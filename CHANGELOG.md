@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add checksum-pinned Terraform and optional Kubernetes companion toolsets.
+
 - Add per-toolset source overrides and explicit MCP configuration mounts.
 - Resolve configured relative mount paths from the selected workspace.
 

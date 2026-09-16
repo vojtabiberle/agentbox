@@ -116,7 +116,7 @@ Do not duplicate existing mount/environment metadata in a second configuration f
 
 ## Backlog — scope and priority not committed
 
-- Terraform toolset and additional Kubernetes companion tools, based on demand.
+- [x] Terraform and optional `kubernetes-extras` (kubectx, kubens, stern) toolsets.
 - Pre-built images for common stacks, with an agreed publishing/update policy.
 - [x] Per-toolset source overrides by declared target in `toolset_mounts`.
 - [x] Explicit read-only MCP configuration sharing through `mcp_mounts`.

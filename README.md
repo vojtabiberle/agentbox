@@ -668,3 +668,18 @@ or make host executables available inside the container. Server commands must be
 installed by toolsets/project Dockerfile, and provider credentials must be passed
 explicitly. Configured relative mount sources, including Claude paths, resolve
 from the target workspace. Avoid storing credential-bearing files in Git.
+
+### Infrastructure toolsets
+
+`terraform` installs Terraform 1.16.3. `kubernetes-extras` adds kubectx/kubens
+0.10.2 and stern 1.34.0 on top of the minimal `kubernetes` toolset. Both download
+versioned upstream releases and verify embedded SHA256 checksums for Linux amd64
+and arm64; unsupported architectures fail explicitly. Host kubeconfig/cloud
+credentials are not mounted implicitly. Select only the tools you need:
+
+```yaml
+toolsets: [terraform, kubernetes-extras]
+```
+
+Offline executable checks can be run with `AGENTBOX_INFRA_TEST_IMAGE` pointing to
+an image containing these toolsets and `pytest tests/test_infrastructure_toolsets.py`.

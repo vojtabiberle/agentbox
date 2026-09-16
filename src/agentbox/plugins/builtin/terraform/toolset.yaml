@@ -1,0 +1,13 @@
+name: terraform
+description: Terraform CLI 1.16.3 (checksum-pinned)
+provides: [terraform]
+depends_on: [base]
+priority: 50
+dockerfile: |
+  RUN dnf install -y unzip && dnf clean all
+  RUN set -eu; case "$(uname -m)" in x86_64) arch=amd64; checksum=093b6ae9a2228af5029c41606bc96eb583553528aad1bfe7e0b4d62fc91e25d8 ;; aarch64) arch=arm64; checksum=b6b293550af7a6a7ffd867a04900ce161db86ec9407b234a636c2adbae2ca9f0 ;; *) exit 1 ;; esac; \
+      curl -fsSL "https://releases.hashicorp.com/terraform/1.16.3/terraform_1.16.3_linux_${arch}.zip" -o /tmp/tool.zip; \
+      printf '%s  %s\n' "$checksum" /tmp/tool.zip | sha256sum -c -; \
+      mkdir /tmp/tool; unzip -q /tmp/tool.zip -d /tmp/tool; \
+      install -m 755 /tmp/tool/terraform /usr/local/bin/terraform; \
+      rm -rf /tmp/tool /tmp/tool.zip
