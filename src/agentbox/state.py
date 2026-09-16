@@ -59,7 +59,26 @@ def record_runtime(home: Path, runtime: str) -> None:
             "CONTAINER_CONNECTION",
         )
     )
-    record = {"runtime": runtime, "environment": {key: os.environ.get(key) for key in keys}}
+    environment = {key: os.environ.get(key) for key in keys}
+    if (
+        runtime == "docker"
+        and not os.environ.get("DOCKER_HOST")
+        and not os.environ.get("DOCKER_CONTEXT")
+    ):
+        try:
+            result = subprocess.run(
+                ["docker", "context", "show"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            context = result.stdout.strip()
+            if not isinstance(context, str) or not context:
+                raise ValueError("Missing Docker context")
+            environment["DOCKER_CONTEXT"] = context
+        except (OSError, subprocess.CalledProcessError, ValueError) as err:
+            raise ConfigError("Cannot record Docker context") from err
+    record = {"runtime": runtime, "environment": environment}
     data = json.dumps(record, sort_keys=True).encode()
     name = hashlib.sha256(data).hexdigest()[:16]
     path = home.parent / f".runtime-{name}.json"

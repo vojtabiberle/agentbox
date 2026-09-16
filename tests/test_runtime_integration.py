@@ -175,3 +175,30 @@ def test_explicit_mcp_mount_is_readonly(tmp_path):
     result = subprocess.run(runtime.build_command(spec), capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     assert config_file.read_text() == '{"mcpServers": {}}'
+
+
+def test_managed_service_lifecycle_retains_state(tmp_path):
+    from agentbox.exceptions import ConfigError
+    from agentbox.service import inspect_service, start_service, stop_service
+    from agentbox.state import reset_state
+
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
+    spec = prepare_run(
+        IMAGE,
+        tmp_path,
+        [],
+        ["bash", "-c", 'echo remembered > "$HOME/service-memory"; exec sleep 60'],
+        Config(state_dir=tmp_path / "state"),
+        agent=get_agent("hermes"),
+        interactive=False,
+        name=f"agentbox-service-test-{os.getpid()}",
+    )
+    start_service(runtime, spec, "no")
+    try:
+        assert inspect_service(runtime, spec.name)["State"]["Running"]
+        with pytest.raises(ConfigError, match="active"):
+            reset_state(spec.home, runtime.runtime)
+    finally:
+        stop_service(runtime, spec.name)
+    assert (spec.home / "service-memory").read_text().strip() == "remembered"
+    reset_state(spec.home, runtime.runtime)

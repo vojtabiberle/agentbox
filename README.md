@@ -726,3 +726,36 @@ remain workspace-relative. The selected file must exist and cannot escape the
 workspace through `..`, absolute paths or symlinks. Without a selection, only the
 workspace-root `Dockerfile.agentbox` is discovered. Files omit `FROM`; the chosen
 path, instructions and base image contribute to the project image tag.
+
+### Hermes gateway service
+
+Configure Hermes provider access and messaging platforms in its private HOME
+first (`agentbox run --agent hermes ~/project -- gateway setup`). Restrict allowed
+senders using Hermes platform settings before accepting bot traffic. Agentbox
+runs the foreground gateway under container supervision, without installing host
+system services, sharing host bot credentials or publishing inbound ports.
+
+```bash
+agentbox service start ~/project --name project-bot --env OPENAI_API_KEY
+agentbox service status project-bot
+agentbox service logs project-bot --tail 100
+agentbox service stop project-bot
+```
+
+Use `agentbox service --runtime docker ...` to select Docker explicitly. The
+selected Docker context/DOCKER_HOST or Podman connection still applies. Gateway
+containers are labelled; status/logs/stop refuse unrelated containers. Stop
+removes the managed container but retains private HOME. To apply new credentials
+or configuration, stop and start again. Start refuses HOME already used by an
+active container; foreground Hermes sessions and gateways should not share it
+concurrently. All service container arguments are built through the same mount,
+UID and credential validation as foreground runs.
+
+The default restart policy is `on-failure:3`; `--restart-policy unless-stopped`
+opts into indefinite restart while the daemon is available. Host daemon startup
+and user-session persistence remain host administration responsibilities. A
+created/running container is not proof of bot readiness: inspect gateway logs and
+verify the configured platform separately. Provider/bot tokens must be explicitly
+configured or forwarded with `--env NAME`; platform configuration is never
+inferred from host files. Logs are emitted by Hermes and may contain sensitive
+application output. No authenticated third-party bot traffic is exercised by CI.

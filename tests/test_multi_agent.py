@@ -18,6 +18,7 @@ from agentbox.plugins import PluginManager
 @pytest.fixture(autouse=True)
 def standard_docker_daemon(monkeypatch):
     monkeypatch.setattr(ContainerRuntime, "is_rootless_docker", lambda self: False)
+    monkeypatch.setattr("agentbox.container.record_runtime", lambda home, runtime: None)
 
 
 

@@ -126,7 +126,9 @@ Do not duplicate existing mount/environment metadata in a second configuration f
 - [x] Named concurrent containers through `--name`.
 - [x] Public `--non-interactive` CLI operation with stdin/exit-code preservation
   and explicit `--env NAME` forwarding.
-- Hermes gateway/bot services and unattended operation as a separate milestone,
-  requiring a lifecycle, networking and credential design before implementation.
+- [x] Opt-in Hermes gateway lifecycle with labelled detached containers,
+  bounded restart policy, private state, logs/status/stop and explicit credentials.
+  Provider/platform setup remains user-controlled; no live third-party bot
+  messaging is claimed by lifecycle tests.
 - [x] Explicit monorepo Dockerfile selection with workspace-confined paths and
   workspace-root COPY context.

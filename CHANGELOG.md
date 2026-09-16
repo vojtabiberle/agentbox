@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add managed Hermes gateway start/status/logs/stop with explicit restart policy.
+- Preserve Docker context identity for subsequent state-safety checks.
+
 - Add workspace-confined monorepo Dockerfile selection via --dockerfile/config.
 
 - Add Codex and Aider adapters with pinned toolsets and isolated HOME.
