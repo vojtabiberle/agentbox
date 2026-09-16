@@ -49,7 +49,7 @@ def test_home_and_hermes_survive_container_restart(tmp_path, monkeypatch):
     run(
         """
         test "$(id -u)" = """
-        + str(os.getuid())
+        + str(0 if runtime.is_rootless_docker() else os.getuid())
         + """
         test "$PWD" = /workspace
         mkdir -p "$HOME/.cache/node/corepack/v1" "$HOME/.local/bin" "$HOME/.config"

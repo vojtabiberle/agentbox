@@ -13,6 +13,11 @@ from agentbox.execution import prepare_run, resolve_mounts
 from agentbox.git import GitWorktreeInfo
 from agentbox.plugins.models import MountConfig
 
+@pytest.fixture(autouse=True)
+def standard_docker_daemon(monkeypatch):
+    monkeypatch.setattr(ContainerRuntime, "is_rootless_docker", lambda self: False)
+
+
 
 @pytest.fixture
 def context(tmp_path, monkeypatch):

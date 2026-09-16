@@ -14,6 +14,11 @@ from agentbox.exceptions import RuntimeNotFoundError
 from agentbox.execution import prepare_run, resolve_mounts
 from agentbox.git import GitWorktreeInfo
 
+@pytest.fixture(autouse=True)
+def standard_docker_daemon(monkeypatch):
+    monkeypatch.setattr(ContainerRuntime, "is_rootless_docker", lambda self: False)
+
+
 
 class TestVerifyRuntime:
     """Tests for _verify_runtime method."""

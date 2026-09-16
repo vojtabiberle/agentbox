@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Detect rootless Docker daemons and map container UID 0 to the host user.
+- Verify Hermes state/cache and project image builds on a rootless daemon.
+
 ## 0.2.1 — 2026-09-16
 
 - Resolve `run` project configuration from the target workspace, including when

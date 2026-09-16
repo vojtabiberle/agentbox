@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 from typing import Literal
 
-from .exceptions import RuntimeNotFoundError
+from .exceptions import ConfigError, RuntimeNotFoundError
 from .execution import RunSpec
 
 
@@ -65,7 +66,8 @@ class ContainerRuntime:
         if self.runtime == "podman":
             cmd.extend(["--userns=keep-id", "--security-opt=no-new-privileges"])
         else:
-            cmd.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+            user = "0:0" if self.is_rootless_docker() else f"{os.getuid()}:{os.getgid()}"
+            cmd.extend(["--user", user])
         for mount in spec.mounts:
             mode = "ro" if mount.readonly else "rw"
             suffix = self._vol_suffix(mode) if mount.relabel else f":{mode}"
@@ -79,6 +81,24 @@ class ContainerRuntime:
         for key, value in environment.items():
             cmd.extend(["-e", f"{key}={value}"])
         return [*cmd, spec.image, *spec.command]
+
+    def is_rootless_docker(self) -> bool:
+        """Detect daemon UID mapping, honoring Docker context/DOCKER_HOST."""
+        if self.runtime != "docker":
+            return False
+        try:
+            result = subprocess.run(
+                [self.runtime, "info", "--format", "{{json .SecurityOptions}}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            options = json.loads(result.stdout)
+        except (subprocess.CalledProcessError, ValueError) as err:
+            raise ConfigError("Cannot determine Docker daemon security mode") from err
+        if not isinstance(options, list) or not all(isinstance(item, str) for item in options):
+            raise ConfigError("Docker returned invalid security options")
+        return "name=rootless" in options
 
     @staticmethod
     def _get_terminal_columns() -> str:

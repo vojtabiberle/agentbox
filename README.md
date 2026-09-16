@@ -574,3 +574,16 @@ agentbox/
 ## Trademark
 
 AgentBox™ is a trademark of Vojta Biberle. Forks and derived works must use a different name and branding.
+
+### Rootless Docker
+
+Agentbox detects the selected Docker daemon through `docker info` (including
+`DOCKER_HOST` and Docker contexts). A standard daemon runs containers as the host
+UID/GID. A rootless daemon runs them as container `0:0`, which maps to the
+unprivileged daemon owner on the host and allows writes to bind-mounted HOME
+and workspace directories. See [Docker UID mapping](https://docs.docker.com/engine/security/rootless/uid-gid-mapping/).
+
+Verified with a separate rootless Docker 29.7.2 daemon: Hermes startup, private
+HOME/cache persistence, Corepack/Yarn and project Dockerfile builds. This is
+runtime verification; individual agents can impose their own container UID rules.
+Run the opt-in runtime tests with `DOCKER_HOST` pointing to your rootless socket.

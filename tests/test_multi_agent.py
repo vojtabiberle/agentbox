@@ -15,6 +15,11 @@ from agentbox.execution import prepare_run
 from agentbox.image import ImageBuilder
 from agentbox.plugins import PluginManager
 
+@pytest.fixture(autouse=True)
+def standard_docker_daemon(monkeypatch):
+    monkeypatch.setattr(ContainerRuntime, "is_rootless_docker", lambda self: False)
+
+
 
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):

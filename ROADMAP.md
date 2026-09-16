@@ -53,7 +53,7 @@ for configuration, plugin examples and integration-test commands.
   (provider `openai-api`, model `gpt-5.6-sol`) and recalled the task after restart.
   Provider access is required for these manual tests; model calls are not in CI.
 
-## Patch release: v0.2.1 preparation
+## Released: v0.2.1
 
 Merged in [PR #26](https://github.com/vojtabiberle/agentbox/pull/26), commit `ea7b4bd`.
 
@@ -75,7 +75,7 @@ Merged in [PR #26](https://github.com/vojtabiberle/agentbox/pull/26), commit `ea
 
 ### 1. Release the completed fixes
 
-- [ ] Publish a patch release containing PR #26.
+- [x] Published [v0.2.1](https://github.com/vojtabiberle/agentbox/releases/tag/v0.2.1).
 
 Done when: the release version and changelog agree, CI and distribution-install
 checks pass for the release commit, and the tagged release includes wheel/sdist
@@ -83,7 +83,8 @@ artifacts plus notes about workspace configuration and required mount sources.
 
 ### 2. Verify rootless Docker explicitly
 
-- [ ] Test against a rootless Docker daemon and document the supported setup.
+- [x] Rootless Docker 29.7.2 verified with Hermes/HOME/cache and project builds;
+  automatic daemon detection selects the matching UID mapping.
 
 Done when: workspace writes, private HOME ownership, restart persistence and
 project image builds pass against that daemon. If UID mapping needs changes,
