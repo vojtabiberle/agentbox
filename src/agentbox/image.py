@@ -54,7 +54,12 @@ class ImageBuilder:
         """Build the toolset image and optional workspace extension."""
         extension = None
         if self.workspace is not None:
-            path = self.workspace / "Dockerfile.agentbox"
+            selected = self.config.project_dockerfile or Path("Dockerfile.agentbox")
+            path = (self.workspace / selected).resolve()
+            if not path.is_relative_to(self.workspace):
+                raise ImageBuildError("Project Dockerfile must stay inside the workspace")
+            if self.config.project_dockerfile is not None and not path.is_file():
+                raise ImageBuildError(f"Selected project Dockerfile does not exist: {path}")
             if path.exists():
                 try:
                     extension = path.read_text()
@@ -77,7 +82,7 @@ class ImageBuilder:
 
         assert self.workspace is not None
         project_dockerfile = f"FROM {image_name}\n{extension}\n"
-        identity = f"{self.workspace}\n{project_dockerfile}"
+        identity = f"{self.workspace}\n{path.relative_to(self.workspace)}\n{project_dockerfile}"
         digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
         project = re.sub(r"[^a-z0-9-]", "-", self.workspace.name.lower()).strip("-")[:20]
         project_image = f"{image_name.rsplit(':', 1)[0]}:{project or 'project'}-{digest}"

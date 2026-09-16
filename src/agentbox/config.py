@@ -43,6 +43,7 @@ class Config(BaseModel):
     mcp_mounts: list[MCPMountConfig] = Field(default_factory=list)
     credentials: CredentialsConfig = Field(default_factory=CredentialsConfig)
     claude: ClaudeConfig = Field(default_factory=ClaudeConfig)
+    project_dockerfile: Path | None = None
     image_name: str = "agentbox"
     state_dir: Path = Field(default_factory=lambda: Path.home() / ".local/state/agentbox")
 

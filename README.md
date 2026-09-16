@@ -710,3 +710,19 @@ default. Aider provider options are documented in its
 [usage guide](https://aider.chat/docs/usage.html); its project chat history remains
 in the mounted workspace, and `--restore-chat-history` restores it. Agentbox
 passes agent arguments through without changing model choices or Git behavior.
+
+### Monorepo Dockerfiles
+
+Select a Dockerfile inside the workspace explicitly:
+
+```bash
+agentbox run --dockerfile services/api/Dockerfile.agentbox ~/monorepo
+agentbox build --dockerfile services/api/Dockerfile.agentbox
+```
+
+The equivalent setting is `project_dockerfile: services/api/Dockerfile.agentbox`.
+The build context and `.dockerignore` stay at the workspace root, so COPY paths
+remain workspace-relative. The selected file must exist and cannot escape the
+workspace through `..`, absolute paths or symlinks. Without a selection, only the
+workspace-root `Dockerfile.agentbox` is discovered. Files omit `FROM`; the chosen
+path, instructions and base image contribute to the project image tag.

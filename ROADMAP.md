@@ -128,4 +128,5 @@ Do not duplicate existing mount/environment metadata in a second configuration f
   and explicit `--env NAME` forwarding.
 - Hermes gateway/bot services and unattended operation as a separate milestone,
   requiring a lifecycle, networking and credential design before implementation.
-- Monorepo subdirectory customization beyond the workspace-root Dockerfile.
+- [x] Explicit monorepo Dockerfile selection with workspace-confined paths and
+  workspace-root COPY context.

@@ -74,7 +74,8 @@ def test_only_workspace_root_is_checked(tmp_path):
 
 
 # This opt-in test exercises the engine cache, not just Dockerfile rendering.
-def test_real_project_copy_cache(tmp_path, monkeypatch):
+@pytest.mark.parametrize("relative", ["Dockerfile.agentbox", "services/api/Dockerfile.agentbox"])
+def test_real_project_copy_cache(tmp_path, monkeypatch, relative):
     import os
     import subprocess
 
@@ -84,13 +85,15 @@ def test_real_project_copy_cache(tmp_path, monkeypatch):
     if runtime_name not in ("podman", "docker"):
         pytest.skip("Set AGENTBOX_PROJECT_TEST_RUNTIME=podman or docker")
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "Dockerfile.agentbox").write_text("COPY dependency.txt /opt/dependency.txt\n")
+    selected = tmp_path / relative
+    selected.parent.mkdir(parents=True, exist_ok=True)
+    selected.write_text("COPY dependency.txt /opt/dependency.txt\n")
     dependency = tmp_path / "dependency.txt"
     dependency.write_text("first")
     runtime = ContainerRuntime(runtime_name)
     builder = ImageBuilder(
         runtime,
-        Config(toolsets=[], image_name="localhost/agentbox-project-test"),
+        Config(toolsets=[], image_name="localhost/agentbox-project-test", project_dockerfile=relative),
         workspace=tmp_path,
     )
     first_image = builder.ensure_image()
@@ -105,3 +108,26 @@ def test_real_project_copy_cache(tmp_path, monkeypatch):
         timeout=60,
     )
     assert result.stdout == "second"
+
+
+def test_selected_nested_dockerfile_uses_workspace_context(tmp_path):
+    selected = tmp_path / "services/api/Dockerfile.agentbox"
+    selected.parent.mkdir(parents=True)
+    selected.write_text("COPY services/api/input.txt /opt/input.txt")
+    runtime = MagicMock()
+    builder = ImageBuilder(runtime, Config(project_dockerfile="services/api/Dockerfile.agentbox"), workspace=tmp_path)
+    builder.ensure_image()
+    assert runtime.build.call_args.kwargs["context"] == tmp_path
+
+
+def test_selected_file_cannot_escape_workspace(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    outside.write_text("RUN true")
+    (workspace / "link").symlink_to(outside)
+    for selected in ["../outside", str(outside), "link", "missing"]:
+        runtime = MagicMock()
+        with pytest.raises(ImageBuildError):
+            ImageBuilder(runtime, Config(project_dockerfile=selected), workspace=workspace).ensure_image()
+        runtime.build.assert_not_called()

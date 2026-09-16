@@ -87,6 +87,9 @@ main.add_command(state)
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
 @click.option("--no-git-mount", is_flag=True, help="Disable automatic git worktree mounting")
 @click.option("--name", help="Container name (must be unique among existing containers)")
+@click.option(
+    "--dockerfile", type=click.Path(path_type=Path), help="Project Dockerfile inside workspace"
+)
 @click.option("--non-interactive", is_flag=True, help="Attach stdin without allocating a TTY")
 @click.option(
     "--env", "forwarded_env", multiple=True, help="Forward a named host environment variable"
@@ -102,6 +105,7 @@ def run(
     rebuild: bool,
     no_git_mount: bool,
     name: str | None,
+    dockerfile: Path | None,
     non_interactive: bool,
     forwarded_env: tuple[str, ...],
 ) -> None:
@@ -111,6 +115,8 @@ def run(
     """
     workspace_path = Path(workspace).expanduser().resolve()
     config, config_path = load_config(workspace_path)
+    if dockerfile is not None:
+        config = config.model_copy(update={"project_dockerfile": dockerfile})
 
     # Create workspace if it doesn't exist
     if not workspace_path.exists():
@@ -170,11 +176,16 @@ def run(
 @main.command()
 @click.option("--rebuild", is_flag=True, help="Force rebuild even if image exists")
 @click.option("--agent", "-a", default="claude", help="Agent to install (default: claude)")
+@click.option(
+    "--dockerfile", type=click.Path(path_type=Path), help="Project Dockerfile inside workspace"
+)
 @click.pass_context
-def build(ctx: click.Context, rebuild: bool, agent: str) -> None:
+def build(ctx: click.Context, rebuild: bool, agent: str, dockerfile: Path | None) -> None:
     """Build the container image."""
     config: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
+    if dockerfile is not None:
+        config = config.model_copy(update={"project_dockerfile": dockerfile})
     agent_instance = get_agent(agent)
     config = _with_agent_toolsets(config, agent_instance)
     runtime = ContainerRuntime(config.runtime)
