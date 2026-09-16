@@ -1,30 +1,33 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-09-17
 
 - Add prebuilt image selection/pull/refresh and GHCR stack publishing with registry smoke tests.
-
 - Add managed Hermes gateway start/status/logs/stop with explicit restart policy.
 - Preserve Docker context identity for subsequent state-safety checks.
-
 - Add workspace-confined monorepo Dockerfile selection via --dockerfile/config.
-
 - Add Codex and Aider adapters with pinned toolsets and isolated HOME.
-
 - Add checksum-pinned Terraform and optional Kubernetes companion toolsets.
-
 - Add per-toolset source overrides and explicit MCP configuration mounts.
 - Resolve configured relative mount paths from the selected workspace.
-
 - Add named containers, noninteractive stdin and explicit environment forwarding.
-
 - Add provided-tool inventories and required/relabel flags to toolset inspection.
-
 - Add private state inspection/reset commands, scoped leases and active-container checks.
 - Document private state backup/restore and workspace migration.
-
 - Detect rootless Docker daemons and map container UID 0 to the host user.
 - Verify Hermes state/cache and project image builds on a rootless daemon.
+
+### Verification and migration
+
+384 tests passed with optional container integrations enabled (90% coverage),
+plus 27 separate rootless Docker checks. Codex and Aider each passed an authenticated
+OpenAI task/resume test using `gpt-5.6-sol`. GHCR stack publication, pull/start and
+anonymous registry access passed. Live bot delivery and ARM64 execution are not claimed.
+
+Existing configuration remains valid. Rootless Docker selects the daemon owner's UID
+mapping. Prebuilt images must contain the configured agent/toolsets; `--rebuild`
+refreshes cached tags. State reset refuses unavailable recorded runtime endpoints.
+Gateway provider/bot setup and credential forwarding remain explicit.
 
 ## 0.2.1 — 2026-09-16
 

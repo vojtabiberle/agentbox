@@ -452,7 +452,7 @@ environment:
 - No access to host Docker/Podman socket (can't run containers inside)
 - No GPU access
 - Container is ephemeral — system package changes are lost between runs. Workspace files and private HOME (including user-local packages and cache) persist.
-- Hermes integration currently targets interactive CLI/setup; gateway services are not managed.
+- Hermes gateway services require explicit provider/platform configuration; agentbox manages their container lifecycle.
 
 ## Local Development
 
@@ -778,9 +778,8 @@ Project Dockerfile extensions also work with prebuilt images.
 
 An absent image is pulled; cached images are reused. `--rebuild` explicitly pulls
 again, then rebuilds any project extension. Registry authentication uses the selected
-container engine's normal login configuration. New GHCR packages are private by
-GitHub default: maintainers must enable public visibility in package settings for
-anonymous pulls, or consumers need authenticated package access.
+container engine's normal login configuration. The published agentbox stacks support
+anonymous pulls. For your own private registry images, authenticate with `podman login` or `docker login` first.
 
 Publishing policy: weekly and manual builds update rolling `base`/`python`/`php`
 tags. Release builds publish `vVERSION-STACK` tags. Every run also publishes a
