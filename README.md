@@ -587,3 +587,43 @@ Verified with a separate rootless Docker 29.7.2 daemon: Hermes startup, private
 HOME/cache persistence, Corepack/Yarn and project Dockerfile builds. This is
 runtime verification; individual agents can impose their own container UID rules.
 Run the opt-in runtime tests with `DOCKER_HOST` pointing to your rootless socket.
+
+### Private state management
+
+```bash
+agentbox state show ~/project --agent hermes
+agentbox state show ~/project --agent hermes --path-only
+agentbox state list
+agentbox state reset ~/project --agent hermes
+```
+
+`show` and `list` display paths and byte usage, never credentials or session text.
+`reset` asks for confirmation (`--yes` confirms explicitly), refuses leased state
+or state mounted by active containers, and deletes only the selected HOME. It
+checks the current runtime and recorded endpoints from previous runs; an
+unreachable endpoint causes refusal rather than assuming the state is unused.
+The run lease coordinates startup/reset. Do not manually launch containers with
+these state paths while resetting them.
+
+For backup/restore, stop all containers using the selected state first. Backups
+contain credentials; keep them private. The backup directory must not already
+exist. Preserve permissions and symlinks:
+
+```bash
+state_path=$(agentbox state show ~/old-project --agent hermes --path-only)
+umask 077
+cp -a -- "$state_path" ~/private-agentbox-backup
+```
+
+A moved workspace gets a different state path. Restore into the new path while
+its containers are stopped; reset an existing destination first if necessary:
+
+```bash
+new_state=$(agentbox state show ~/new-project --agent hermes --path-only)
+mkdir -p -- "$(dirname "$new_state")"
+# Destination HOME must not exist; otherwise cp would nest the backup.
+test ! -e "$new_state" && cp -a -- ~/private-agentbox-backup "$new_state"
+agentbox run --agent hermes ~/new-project
+```
+
+Restart once more and verify the expected session/config remains available.

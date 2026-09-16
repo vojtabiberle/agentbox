@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import posixpath
 import sys
@@ -14,6 +13,7 @@ from .config import Config
 from .exceptions import ConfigError
 from .git import GitWorktreeInfo
 from .plugins.models import MountConfig
+from .state import state_home
 
 if TYPE_CHECKING:
     from .agents.base import Agent
@@ -35,6 +35,7 @@ class RunSpec:
     environment: tuple[tuple[str, str], ...]
     interactive: bool = True
     share_hostname: bool = False
+    home: Path | None = None
 
 
 def resolve_mounts(mounts: list[MountConfig]) -> tuple[Mount, ...]:
@@ -78,13 +79,7 @@ def prepare_run(
     """Prepare private HOME and validate all mount sources before execution."""
     workspace = workspace.resolve()
     host_home = str(Path.home())
-    workspace_id = hashlib.sha256(str(workspace).encode()).hexdigest()[:16]
-    home = (
-        config.state_dir.expanduser().resolve()
-        / workspace_id
-        / (agent.name if agent is not None else "shell")
-        / "home"
-    )
+    home = state_home(config.state_dir, workspace, agent.name if agent is not None else "shell")
     try:
         home.mkdir(parents=True, exist_ok=True, mode=0o700)
     except OSError as err:
@@ -160,6 +155,7 @@ def prepare_run(
         env["SSH_AUTH_SOCK"] = ssh_sock
     return RunSpec(
         image=image,
+        home=home,
         command=tuple(command),
         mounts=resolve_mounts(requested),
         environment=tuple(env.items()),

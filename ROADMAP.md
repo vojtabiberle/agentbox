@@ -93,11 +93,11 @@ remaining limitation without claiming rootless Docker support.
 
 ### 3. Manage private agent state
 
-- [ ] Show each workspace/agent HOME location and disk usage without exposing
+- [x] Show each workspace/agent HOME location and disk usage without exposing
   credentials or session contents.
-- [ ] Document a backup/restore procedure, including moving a workspace, whose
+- [x] Document a backup/restore procedure, including moving a workspace, whose
   resolved path determines its state identity.
-- [ ] Provide an explicit reset for one workspace/agent, with confirmation and
+- [x] Provide an explicit reset for one workspace/agent, with confirmation and
   protection against deleting state used by a running container.
 
 Done when: users can locate and back up their state, restore it into the intended

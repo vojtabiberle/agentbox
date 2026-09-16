@@ -99,3 +99,31 @@ def test_corepack_yarn_cache_survives_restart(tmp_path, monkeypatch):
                 interactive=False,
             )
         )
+
+
+def test_state_reset_refuses_running_container(tmp_path):
+    from agentbox.exceptions import ConfigError
+    from agentbox.state import reset_state
+
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
+    spec = prepare_run(
+        IMAGE,
+        tmp_path,
+        [],
+        ["sleep", "60"],
+        Config(state_dir=tmp_path / "state"),
+        interactive=False,
+        agent=get_agent("hermes"),
+    )
+    cmd = runtime.build_command(spec)
+    cmd.insert(2, "-d")
+    started = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    container_id = started.stdout.strip()
+    try:
+        with pytest.raises(ConfigError, match="active container"):
+            reset_state(spec.home, runtime.runtime)
+        assert spec.home.is_dir()
+    finally:
+        subprocess.run([runtime.runtime, "rm", "-f", container_id], check=True, capture_output=True)
+    reset_state(spec.home, runtime.runtime)
+    assert not spec.home.exists()

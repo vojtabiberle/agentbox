@@ -9,7 +9,7 @@ implemented support. No model credentials are stored in the repository.
 | --- | --- | --- | --- |
 | 1. Patch release | Version 0.2.1; migration notes; wheel and sdist; GitHub release. | Release assets install and tagged CI passes. | Done: PR #28, v0.2.1 |
 | 2. Rootless Docker | Detect rootless daemon; use correct UID mapping; test HOME and project builds. | Real rootless daemon smoke, or precise documented host prerequisite if unavailable. | Done: 11 real rootless/runtime/project tests |
-| 3. Private state | Shared state paths; location/size CLI; safe scoped reset; backup/restore guide. | Isolation, symlink safety, active-container refusal and restart tests. | Pending |
+| 3. Private state | Shared state paths; location/size CLI; safe scoped reset; backup/restore guide. | Isolation, symlink safety, active-container refusal and restart tests. | Done: state CLI, leases, endpoint checks and tests |
 | 4. Toolset inspection | Optional provided-tools inventory; show required/relabel metadata. | Existing manifests compatible, inventories match installers, CLI tests. | Pending |
 | 5. Runtime controls | Named sessions, noninteractive CLI, explicit environment forwarding. | stdin and exit status preserved; no TTY in batch mode; validated names. | Pending |
 | 6. Mount configuration | Typed per-toolset source overrides and explicit MCP config mounts. | Unknown overrides rejected; paths scoped consistently; no implicit secrets. | Pending |

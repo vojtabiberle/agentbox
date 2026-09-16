@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add private state inspection/reset commands, scoped leases and active-container checks.
+- Document private state backup/restore and workspace migration.
+
 - Detect rootless Docker daemons and map container UID 0 to the host user.
 - Verify Hermes state/cache and project image builds on a rootless daemon.
 

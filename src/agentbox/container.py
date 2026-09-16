@@ -10,6 +10,7 @@ from typing import Literal
 
 from .exceptions import ConfigError, RuntimeNotFoundError
 from .execution import RunSpec
+from .state import record_runtime, state_lease
 
 
 class ContainerRuntime:
@@ -53,7 +54,14 @@ class ContainerRuntime:
     def run(self, spec: RunSpec) -> None:
         """Replace this process with the prepared container."""
         cmd = self.build_command(spec)
-        os.execvp(cmd[0], cmd)
+        if spec.home is None:
+            os.execvp(cmd[0], cmd)
+            return
+        with state_lease(spec.home):
+            if not spec.home.is_dir():
+                raise ConfigError("Private HOME disappeared before startup; retry the run")
+            record_runtime(spec.home, self.runtime)
+            os.execvp(cmd[0], cmd)
 
     def build_command(self, spec: RunSpec) -> list[str]:
         """Render runtime arguments without starting a container."""

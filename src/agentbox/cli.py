@@ -25,6 +25,7 @@ from .execution import prepare_run
 from .git import GitWorktreeInfo, detect_worktree
 from .image import ImageBuilder
 from .plugins import PluginManager
+from .state_cli import state
 
 console = Console(stderr=True)
 
@@ -43,7 +44,7 @@ def main(ctx: click.Context) -> None:
     ctx.ensure_object(dict)
 
     # Run must resolve its workspace before loading project configuration.
-    if ctx.invoked_subcommand == "run":
+    if ctx.invoked_subcommand in {"run", "state"}:
         return
 
     # Commands that can run even with invalid config
@@ -66,6 +67,9 @@ def main(ctx: click.Context) -> None:
 
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+
+
+main.add_command(state)
 
 
 @main.command()
