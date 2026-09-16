@@ -284,8 +284,31 @@ agentbox includes these built-in toolsets:
 | `cloud-azure` | Azure CLI (mounts `~/.azure`) |
 | `cloud-gcloud` | Google Cloud CLI (mounts `~/.config/gcloud`) |
 | `docker` | Docker CLI |
+| `kubernetes` | Kubernetes CLI tools: kubectl, helm, kustomize |
 
 Use `agentbox toolset <name>` to see details about a specific toolset, including mounts and dependencies.
+
+### Kubernetes
+
+Enable the minimal Kubernetes toolset in `.agentbox.yaml`:
+
+```yaml
+toolsets:
+  - kubernetes
+```
+
+This installs `kubectl`, `helm`, and `kustomize` from Fedora packages; `base` and
+the selected agent are included automatically. Configure cluster access in the
+container's private HOME, or explicitly share selected files through a custom
+plugin. Host `~/.kube` is not mounted automatically. Additional companion tools
+and local cluster runtimes are outside this toolset's scope.
+
+Build with `agentbox build`, then verify the printed image with the offline,
+rootless Podman smoke test:
+
+```bash
+AGENTBOX_KUBERNETES_TEST_IMAGE=localhost/agentbox:<printed-tag> pytest -q tests/test_kubernetes.py
+```
 
 ### Toolset Discovery Paths
 

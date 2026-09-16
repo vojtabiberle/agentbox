@@ -1,0 +1,7 @@
+name: kubernetes
+description: Kubernetes CLI tools (kubectl, helm, kustomize)
+depends_on: [base]
+priority: 50
+
+dockerfile: |
+  RUN dnf install -y kubectl helm kustomize && dnf clean all

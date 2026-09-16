@@ -16,7 +16,7 @@ Implementation plan accepted 2026-09-16.
    Hermes startup. Run regression tests, lint and type checks.
 
 Gateway/bot services and unattended operation remain a later, separate milestone.
-Existing Kubernetes work is independent and must be preserved.
+Kubernetes toolset provides kubectl, helm and kustomize; companion tools remain deferred.
 
 Validation: rootless Podman builds for Hermes and Claude; Hermes CLI/configuration
 startup; Corepack/Yarn writes and offline cache reuse across container restarts;
@@ -36,7 +36,8 @@ have not been exercised. See README for the opt-in container tests.
   - Cloud CLIs: AWS, Azure, Google Cloud
   - Other tools: Docker CLI
 - [ ] Pre-built image variants for common stacks (e.g., `agentbox:php`, `agentbox:python`)
-- [ ] Kubernetes, Terraform toolsets
+- [x] Kubernetes toolset (kubectl, helm, kustomize)
+- [ ] Terraform toolset
 
 ## Toolsets
 
