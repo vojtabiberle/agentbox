@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-09-16
 
 - Resolve `run` project configuration from the target workspace, including when
   the invoking directory has an invalid configuration.

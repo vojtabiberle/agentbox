@@ -1,8 +1,9 @@
 # Roadmap
 
 Updated 2026-09-16, after [PR #26](https://github.com/vojtabiberle/agentbox/pull/26).
-Completed work is separated by release status. Upcoming milestones are proposed
-in priority order; backlog items are not delivery commitments.
+All remaining items, including the former backlog, are now accepted implementation
+scope. See [the delivery plan](docs/IMPLEMENTATION_PLAN.md) for functional slices,
+acceptance checks and per-slice progress.
 
 ## Released: v0.2.0
 
@@ -52,7 +53,7 @@ for configuration, plugin examples and integration-test commands.
   (provider `openai-api`, model `gpt-5.6-sol`) and recalled the task after restart.
   Provider access is required for these manual tests; model calls are not in CI.
 
-## Completed on main: not yet released
+## Patch release: v0.2.1 preparation
 
 Merged in [PR #26](https://github.com/vojtabiberle/agentbox/pull/26), commit `ea7b4bd`.
 
