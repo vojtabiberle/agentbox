@@ -29,6 +29,7 @@ def test_home_is_private_persistent_and_scoped(tmp_path, monkeypatch, runtime_na
         def run(workspace, agent):
             runtime.run("test-image", workspace, [], ["bash"], config, agent=get_agent(agent))
             command = execute.call_args.args[1]
+            assert "--init" in command
             mounts = [command[i + 1] for i, arg in enumerate(command) if arg == "-v"]
             home_mount = next(m for m in mounts if m.startswith(str(config.state_dir)))
             source = Path(home_mount.split(":")[0])

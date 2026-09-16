@@ -49,10 +49,10 @@ class ContainerRuntime:
         result = subprocess.run(cmd, capture_output=True)
         return result.returncode == 0
 
-    def build(self, dockerfile_content: str, tag: str) -> None:
+    def build(self, dockerfile_content: str, tag: str, context: Path | None = None) -> None:
         """Build a container image from Dockerfile content."""
         subprocess.run(
-            [self.runtime, "build", "-t", tag, "-f", "-", "."],
+            [self.runtime, "build", "-t", tag, "-f", "-", str(context) if context else "."],
             input=dockerfile_content.encode(),
             check=True,
         )
@@ -91,6 +91,7 @@ class ContainerRuntime:
             "run",
             "-it",
             "--rm",
+            "--init",
             "-v",
             f"{workspace}:/workspace{self._vol_suffix()}",
             "-v",

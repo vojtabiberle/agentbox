@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentbox"
-version = "0.1.0"
+version = "0.2.0"
 description = "Run AI coding agents in isolated containers"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -58,6 +58,11 @@ packages = ["src/agentbox"]
 [tool.hatch.build.targets.sdist]
 include = [
     "src/agentbox/**",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "tests/**",
 ]
 
 [tool.pytest.ini_options]

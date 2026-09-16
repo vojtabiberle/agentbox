@@ -20,8 +20,9 @@ Kubernetes toolset provides kubectl, helm and kustomize; companion tools remain 
 
 Validation: rootless Podman builds for Hermes and Claude; Hermes CLI/configuration
 startup; Corepack/Yarn writes and offline cache reuse across container restarts;
-project/agent state isolation. Authenticated model calls and Docker integration
-have not been exercised. See README for the opt-in container tests.
+project/agent state isolation. Docker HOME/state integration and project builds have also passed. Claude completed
+an authenticated task and resumed after restart. Hermes model-provider testing
+requires separately configured provider access. See README for the opt-in container tests.
 
 ## Container Runtime
 
@@ -118,16 +119,16 @@ have not been exercised. See README for the opt-in container tests.
 
 ## Project-specific Customization
 
-- [ ] `Dockerfile.agentbox` support — when found in project root, extend the base image:
+- [x] `Dockerfile.agentbox` support — when found in project root, extend the base image:
   - Detects `Dockerfile.agentbox` in workspace root (monorepo subdirectories not supported for now)
   - Builds a project-specific image combining base toolsets + custom instructions
   - [x] **Image naming**: Create separate image `agentbox:<project>-<hash>` to avoid polluting base image
     - Allows per-project caching
-    - Base `agentbox:latest` remains shared across projects (used for global config)
+    - Content-tagged base image remains reusable across projects
   - **Build rules**:
-    - Custom file uses `FROM agentbox:latest` (injected automatically or required)
+    - Custom file omits `FROM`; agentbox injects the selected content-tagged base image
     - Runs after all toolset configuration is applied
-    - Rebuilds when `Dockerfile.agentbox` changes (hash-based cache invalidation)
+    - Tags change with project instructions/base; engine cache checks COPY/ADD inputs on every build
     - `--rebuild` flag forces rebuild of both base and project image
   - Example `Dockerfile.agentbox`:
     ```dockerfile

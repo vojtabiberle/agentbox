@@ -252,6 +252,26 @@ credentials:
   aws: true
 ```
 
+### Project-specific dependencies
+
+Place `Dockerfile.agentbox` in the workspace root:
+
+```dockerfile
+RUN dnf install -y postgresql && dnf clean all
+COPY requirements.txt /tmp/project-requirements.txt
+```
+
+Omit `FROM`: agentbox injects the selected agent/toolset image as the base.
+`agentbox run <workspace>` and `agentbox build` (from the workspace directory)
+then build a separate project image. Build context is the workspace; normal
+`.dockerignore` rules apply. Only trusted project Dockerfiles should be built.
+
+Changes to the base image or project instructions select a new project tag.
+Each run asks the container engine to check the project build cache, so changes
+to `COPY`/`ADD` inputs are picked up even when the Dockerfile itself is unchanged.
+`--rebuild` invokes both base and project builds; normal engine layer caching still
+applies. Nested monorepo directories are not searched automatically.
+
 ### Image Tagging
 
 agentbox automatically tags container images based on your configuration:
@@ -489,10 +509,19 @@ agentbox build --agent hermes
 AGENTBOX_TEST_IMAGE=localhost/agentbox:<printed-tag> pytest -q tests/test_runtime_integration.py
 ```
 
-This opt-in test uses rootless Podman and temporary state. It verifies HOME/cache
+These tests default to rootless Podman and temporary state. Set
+`AGENTBOX_TEST_RUNTIME=docker` to test Docker with an image loaded into that runtime.
+They verify HOME/cache
 writes, Hermes CLI/configuration startup, persistence after container restart,
-and separation across agents and workspaces. It also downloads Corepack/Yarn and
-checks offline cache reuse after restart. It makes no paid model calls.
+and separation across agents and workspaces. They also download Corepack/Yarn and
+check offline cache reuse after restart. They make no paid model calls.
+
+To verify project Dockerfile builds and COPY cache invalidation:
+
+```bash
+AGENTBOX_PROJECT_TEST_RUNTIME=podman pytest -q tests/test_project_image.py
+AGENTBOX_PROJECT_TEST_RUNTIME=docker pytest -q tests/test_project_image.py
+```
 
 ### Code Quality
 

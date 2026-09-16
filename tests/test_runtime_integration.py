@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(not IMAGE, reason="Set AGENTBOX_TEST_IMAGE to a 
 
 
 def test_home_and_hermes_survive_container_restart(tmp_path, monkeypatch):
-    runtime = ContainerRuntime("podman")
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
     agent = get_agent("hermes")
     plugins = PluginManager()
     plugins.load(agent.get_required_toolsets())
@@ -69,7 +69,7 @@ def test_home_and_hermes_survive_container_restart(tmp_path, monkeypatch):
 
 
 def test_corepack_yarn_cache_survives_restart(tmp_path, monkeypatch):
-    runtime = ContainerRuntime("podman")
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "package.json").write_text('{"packageManager":"yarn@4.0.0"}')

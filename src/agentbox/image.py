@@ -9,6 +9,7 @@ from rich.console import Console
 
 from .config import Config
 from .container import ContainerRuntime
+from .exceptions import ImageBuildError
 from .plugins import PluginManager
 
 console = Console()
@@ -27,6 +28,7 @@ class ImageBuilder:
         self.runtime = runtime
         self.config = config
         self.config_path = config_path
+        self.workspace = workspace.resolve() if workspace is not None else None
         self.plugin_manager = PluginManager(workspace)
         self._setup_jinja()
 
@@ -49,29 +51,40 @@ class ImageBuilder:
             )
 
     def ensure_image(self, force_rebuild: bool = False) -> str:
-        """Ensure the container image exists, building if necessary."""
-        # Always load plugins so mounts/env are available even on cache hits
+        """Build the toolset image and optional workspace extension."""
+        extension = None
+        if self.workspace is not None:
+            path = self.workspace / "Dockerfile.agentbox"
+            if path.exists():
+                try:
+                    extension = path.read_text()
+                except (OSError, UnicodeError) as err:
+                    raise ImageBuildError(f"Cannot read {path}: {err}") from err
+                if re.search(r"(?im)^\s*FROM(?:\s|$)", extension):
+                    raise ImageBuildError(f"{path}: omit FROM; agentbox supplies the base image")
+
         self.plugin_manager.load(self.config.toolsets)
-
-        # Render dockerfile first (needed for hash computation)
         dockerfile = self._render_dockerfile()
-
-        # Compute image name (unique tag for project configs)
         image_name = self._compute_image_name(dockerfile)
+        if force_rebuild or not self.runtime.image_exists(image_name):
+            console.print(f"[cyan]Building {image_name} image...[/cyan]")
+            self.runtime.build(dockerfile, image_name)
+            console.print("[green]Image built successfully.[/green]")
 
-        if not force_rebuild and self.runtime.image_exists(image_name):
+        if extension is None:
             return image_name
 
-        console.print(f"[cyan]Building {image_name} image...[/cyan]")
-        console.print("This may take a few minutes on first run.")
-        console.print()
-
-        self.runtime.build(dockerfile, image_name)
-
-        console.print()
-        console.print("[green]Image built successfully.[/green]")
-
-        return image_name
+        assert self.workspace is not None
+        project_dockerfile = f"FROM {image_name}\n{extension}\n"
+        identity = f"{self.workspace}\n{project_dockerfile}"
+        digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
+        project = re.sub(r"[^a-z0-9-]", "-", self.workspace.name.lower()).strip("-")[:20]
+        project_image = f"{image_name.rsplit(':', 1)[0]}:{project or 'project'}-{digest}"
+        console.print(f"[cyan]Building project image {project_image}...[/cyan]")
+        # Let the engine evaluate COPY/ADD inputs and .dockerignore on every run.
+        # Checking only image existence would reuse stale project dependencies.
+        self.runtime.build(project_dockerfile, project_image, context=self.workspace)
+        return project_image
 
     def _compute_image_name(self, dockerfile: str) -> str:
         """Compute the image name, using unique tag for project configs.
