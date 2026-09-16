@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add prebuilt image selection/pull/refresh and GHCR stack publishing with registry smoke tests.
+
 - Add managed Hermes gateway start/status/logs/stop with explicit restart policy.
 - Preserve Docker context identity for subsequent state-safety checks.
 

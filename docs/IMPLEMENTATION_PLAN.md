@@ -17,7 +17,7 @@ implemented support. No model credentials are stored in the repository.
 | 8. Agents | Codex and Aider adapters/toolsets with provider setup documentation. | Isolated HOME, install/start/restart smoke; model tests where credentials permit. | Done: startup/isolation and authenticated task/resume verified for both agents |
 | 9. Monorepos | Explicit project Dockerfile selection inside workspace. | Path confinement; build context/cache tests; default unchanged. | Done: explicit selection with confinement/cache tests |
 | 10. Gateway services | Opt-in Hermes gateway lifecycle, named detached containers, logs/stop/status; minimal network exposure. | Lifecycle tests, private state, documented provider/bot credential setup. | Done: lifecycle and active-state checks on Podman/rootless Docker |
-| 11. Prebuilt images | CI builds/publishes a small stack matrix to GHCR; versioned tags and update policy. | Registry artifacts published and pulled for smoke testing. | Pending |
+| 11. Prebuilt images | CI builds/publishes a small stack matrix to GHCR; versioned tags and update policy. | Registry artifacts published and pulled for smoke testing. | Implemented; CI/registry validation pending |
 | 12. Final release | Reconcile roadmap/changelog with delivered features and actual verification; publish release. | Full CI, runtime and package checks; no unchecked implementation items. | Pending |
 
 State reset must never remove another agent/workspace or follow a host symlink.

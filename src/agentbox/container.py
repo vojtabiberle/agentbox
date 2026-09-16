@@ -43,6 +43,23 @@ class ContainerRuntime:
         result = subprocess.run(cmd, capture_output=True)
         return result.returncode == 0
 
+    def pull(self, image: str) -> None:
+        """Pull an explicitly selected image using runtime registry authentication."""
+        subprocess.run([self.runtime, "pull", image], check=True)
+
+    def image_id(self, image: str) -> str:
+        """Resolve a mutable image tag before composing a project extension."""
+        result = subprocess.run(
+            [self.runtime, "image", "inspect", "--format", "{{.Id}}", image],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        identity = result.stdout.strip()
+        if not identity or any(char.isspace() for char in identity):
+            raise ConfigError("Container runtime returned an invalid image ID")
+        return identity
+
     def build(self, dockerfile_content: str, tag: str, context: Path | None = None) -> None:
         """Build a container image from Dockerfile content."""
         subprocess.run(

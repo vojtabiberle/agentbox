@@ -86,6 +86,7 @@ main.add_command(service)
     type=click.Path(exists=True),
     help="Read-only directory to mount (can be used multiple times)",
 )
+@click.option("--image", help="Use a prebuilt image instead of building toolsets")
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
 @click.option("--no-git-mount", is_flag=True, help="Disable automatic git worktree mounting")
 @click.option("--name", help="Container name (must be unique among existing containers)")
@@ -108,6 +109,7 @@ def run(
     no_git_mount: bool,
     name: str | None,
     dockerfile: Path | None,
+    image: str | None,
     non_interactive: bool,
     forwarded_env: tuple[str, ...],
 ) -> None:
@@ -117,6 +119,8 @@ def run(
     """
     workspace_path = Path(workspace).expanduser().resolve()
     config, config_path = load_config(workspace_path)
+    if image is not None:
+        config = config.model_copy(update={"prebuilt_image": image})
     if dockerfile is not None:
         config = config.model_copy(update={"project_dockerfile": dockerfile})
 
@@ -176,16 +180,21 @@ def run(
 
 
 @main.command()
+@click.option("--image", help="Use a prebuilt image instead of building toolsets")
 @click.option("--rebuild", is_flag=True, help="Force rebuild even if image exists")
 @click.option("--agent", "-a", default="claude", help="Agent to install (default: claude)")
 @click.option(
     "--dockerfile", type=click.Path(path_type=Path), help="Project Dockerfile inside workspace"
 )
 @click.pass_context
-def build(ctx: click.Context, rebuild: bool, agent: str, dockerfile: Path | None) -> None:
+def build(
+    ctx: click.Context, rebuild: bool, agent: str, dockerfile: Path | None, image: str | None
+) -> None:
     """Build the container image."""
     config: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
+    if image is not None:
+        config = config.model_copy(update={"prebuilt_image": image})
     if dockerfile is not None:
         config = config.model_copy(update={"project_dockerfile": dockerfile})
     agent_instance = get_agent(agent)
@@ -236,6 +245,8 @@ def config_show(ctx: click.Context) -> None:
     console.print()
     console.print(f"[cyan]Runtime:[/cyan]    {cfg.runtime}")
     console.print(f"[cyan]Image:[/cyan]      {cfg.image_name}")
+    if cfg.prebuilt_image:
+        console.print(f"[cyan]Prebuilt:[/cyan]   {cfg.prebuilt_image}")
     console.print(f"[cyan]State:[/cyan]      {cfg.state_dir.expanduser()}")
 
     # Get all available toolsets (include cwd for project plugin discovery)

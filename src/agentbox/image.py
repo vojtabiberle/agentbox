@@ -70,22 +70,33 @@ class ImageBuilder:
 
         self.plugin_manager.load(self.config.toolsets)
         self.plugin_manager.get_all_mounts(self.config.toolset_mounts, self.workspace)
-        dockerfile = self._render_dockerfile()
-        image_name = self._compute_image_name(dockerfile)
-        if force_rebuild or not self.runtime.image_exists(image_name):
-            console.print(f"[cyan]Building {image_name} image...[/cyan]")
-            self.runtime.build(dockerfile, image_name)
-            console.print("[green]Image built successfully.[/green]")
+        if self.config.prebuilt_image is not None:
+            image_name = self.config.prebuilt_image
+            if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/:@-]*", image_name):
+                raise ImageBuildError("Invalid prebuilt image reference")
+            if force_rebuild or not self.runtime.image_exists(image_name):
+                self.runtime.pull(image_name)
+        else:
+            dockerfile = self._render_dockerfile()
+            image_name = self._compute_image_name(dockerfile)
+            if force_rebuild or not self.runtime.image_exists(image_name):
+                console.print(f"[cyan]Building {image_name} image...[/cyan]")
+                self.runtime.build(dockerfile, image_name)
+                console.print("[green]Image built successfully.[/green]")
 
         if extension is None:
             return image_name
 
         assert self.workspace is not None
+        base = self.runtime.image_id(image_name) if self.config.prebuilt_image else image_name
         project_dockerfile = f"FROM {image_name}\n{extension}\n"
-        identity = f"{self.workspace}\n{path.relative_to(self.workspace)}\n{project_dockerfile}"
+        identity = (
+            f"{self.workspace}\n{path.relative_to(self.workspace)}\n{base}\n{project_dockerfile}"
+        )
         digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
         project = re.sub(r"[^a-z0-9-]", "-", self.workspace.name.lower()).strip("-")[:20]
-        project_image = f"{image_name.rsplit(':', 1)[0]}:{project or 'project'}-{digest}"
+        local_base = self.config.image_name if self.config.prebuilt_image else image_name
+        project_image = f"{local_base.rsplit(':', 1)[0]}:{project or 'project'}-{digest}"
         console.print(f"[cyan]Building project image {project_image}...[/cyan]")
         # Let the engine evaluate COPY/ADD inputs and .dockerignore on every run.
         # Checking only image existence would reuse stale project dependencies.

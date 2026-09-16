@@ -1,0 +1,83 @@
+name: Container Images
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [base, python, php]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install .
+      - name: Render built-in stack
+        env:
+          STACK: ${{ matrix.stack }}
+        run: |
+          cd /tmp
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from agentbox.config import Config
+          from agentbox.container import ContainerRuntime
+          from agentbox.image import ImageBuilder
+          builder = ImageBuilder(ContainerRuntime('docker'), Config(toolsets=['claude', os.environ['STACK']]))
+          builder.plugin_manager.load(builder.config.toolsets)
+          Path('/tmp/agentbox.Dockerfile').write_text(builder._render_dockerfile())
+          PY
+      - name: Build and smoke test
+        env:
+          STACK: ${{ matrix.stack }}
+        run: |
+          mkdir -p /tmp/agentbox-image-context
+          docker build --pull --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --label "org.opencontainers.image.revision=$GITHUB_SHA" -t agentbox-check -f /tmp/agentbox.Dockerfile /tmp/agentbox-image-context
+          docker run --rm agentbox-check claude --version
+          docker run --rm agentbox-check git --version
+          case "$STACK" in
+            python) docker run --rm agentbox-check python3 --version ;;
+            php) docker run --rm agentbox-check php --version; docker run --rm agentbox-check composer --version ;;
+          esac
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish and verify registry artifact
+        env:
+          STACK: ${{ matrix.stack }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          unique="$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$STACK"
+          docker tag agentbox-check "$unique"
+          docker push "$unique"
+          docker image rm "$unique"
+          docker pull "$unique"
+          docker run --rm "$unique" claude --version
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$image:$GITHUB_REF_NAME-$STACK"
+          else
+            tag="$image:$STACK"
+          fi
+          docker tag agentbox-check "$tag"
+          docker push "$tag"
+          printf '%s\n' "Published $tag" >> "$GITHUB_STEP_SUMMARY"
+          docker image inspect --format '{{join .RepoDigests "\n"}}' "$unique" >> "$GITHUB_STEP_SUMMARY"

@@ -759,3 +759,34 @@ verify the configured platform separately. Provider/bot tokens must be explicitl
 configured or forwarded with `--env NAME`; platform configuration is never
 inferred from host files. Logs are emitted by Hermes and may contain sensitive
 application output. No authenticated third-party bot traffic is exercised by CI.
+
+### Prebuilt images
+
+Use a published Linux amd64 stack instead of building its toolsets locally:
+
+```bash
+agentbox run ~/project --image ghcr.io/vojtabiberle/agentbox:python
+agentbox build --image ghcr.io/vojtabiberle/agentbox:python --rebuild
+```
+
+Or set `prebuilt_image: ghcr.io/vojtabiberle/agentbox:python` in configuration.
+The `base`, `python` and `php` stacks all include Claude; the latter two add the
+named language toolset. Match your configured toolsets/agent to the image: selecting
+an image does not install missing tools. Mount/environment configuration still applies.
+Hermes/Codex/Aider and custom toolsets currently use local builds or your own images.
+Project Dockerfile extensions also work with prebuilt images.
+
+An absent image is pulled; cached images are reused. `--rebuild` explicitly pulls
+again, then rebuilds any project extension. Registry authentication uses the selected
+container engine's normal login configuration. New GHCR packages are private by
+GitHub default: maintainers must enable public visibility in package settings for
+anonymous pulls, or consumers need authenticated package access.
+
+Publishing policy: weekly and manual builds update rolling `base`/`python`/`php`
+tags. Release builds publish `vVERSION-STACK` tags. Every run also publishes a
+unique `build-RUN_ID-ATTEMPT-STACK` tag and records its digest in the workflow summary.
+Pin `ghcr.io/vojtabiberle/agentbox@sha256:...` for immutable deployments; rolling tags
+receive upstream package/security updates. Builds smoke-test each stack before push
+and pull the registry artifact for a second startup check. Images contain tools only;
+no model or cloud credentials are provided to this workflow. ARM64 requires local
+builds until a native ARM64 publishing/test runner is added.

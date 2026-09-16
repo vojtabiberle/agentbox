@@ -45,6 +45,7 @@ class Config(BaseModel):
     claude: ClaudeConfig = Field(default_factory=ClaudeConfig)
     project_dockerfile: Path | None = None
     image_name: str = "agentbox"
+    prebuilt_image: str | None = None
     state_dir: Path = Field(default_factory=lambda: Path.home() / ".local/state/agentbox")
 
 
