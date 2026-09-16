@@ -118,8 +118,8 @@ Do not duplicate existing mount/environment metadata in a second configuration f
 
 - Terraform toolset and additional Kubernetes companion tools, based on demand.
 - Pre-built images for common stacks, with an agreed publishing/update policy.
-- Per-toolset path overrides in project/global configuration; schema undecided.
-- Explicit MCP configuration sharing.
+- [x] Per-toolset source overrides by declared target in `toolset_mounts`.
+- [x] Explicit read-only MCP configuration sharing through `mcp_mounts`.
 - Additional agents such as Aider and Codex, each with installation, provider
   setup, isolation and restart verification.
 - [x] Named concurrent containers through `--name`.

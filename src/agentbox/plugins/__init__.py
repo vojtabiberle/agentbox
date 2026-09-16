@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.exceptions import (
+    ConfigError,
     PluginDependencyError,
     PluginNotFoundError,
     PluginValidationError,
@@ -194,15 +195,31 @@ class PluginManager:
                 fragments.append(f"{comment}\n{plugin.manifest.dockerfile}")
         return fragments
 
-    def get_all_mounts(self) -> list[MountConfig]:
-        """Get all mount configurations from loaded plugins.
-
-        Returns:
-            List of MountConfig instances from all loaded plugins
-        """
+    def get_all_mounts(
+        self,
+        overrides: dict[str, dict[str, Path]] | None = None,
+        workspace: Path | None = None,
+    ) -> list[MountConfig]:
+        """Resolve explicit source overrides by toolset and declared target."""
+        overrides = overrides or {}
+        loaded = {plugin.manifest.name for plugin in self._loaded}
+        if unknown := overrides.keys() - loaded:
+            raise ConfigError(f"Mount overrides reference unloaded toolsets: {sorted(unknown)}")
         mounts: list[MountConfig] = []
         for plugin in self._loaded:
-            mounts.extend(plugin.manifest.mounts)
+            replacements = overrides.get(plugin.manifest.name, {})
+            targets = {mount.target for mount in plugin.manifest.mounts}
+            if unknown := replacements.keys() - targets:
+                raise ConfigError(
+                    f"Unknown mount targets for {plugin.manifest.name}: {sorted(unknown)}"
+                )
+            for mount in plugin.manifest.mounts:
+                if mount.target in replacements:
+                    source = replacements[mount.target].expanduser()
+                    if not source.is_absolute():
+                        source = (workspace or Path.cwd()) / source
+                    mount = mount.model_copy(update={"source": str(source), "required": True})
+                mounts.append(mount)
         return mounts
 
     def get_all_environment(self) -> dict[str, str]:

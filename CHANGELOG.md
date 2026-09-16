@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add per-toolset source overrides and explicit MCP configuration mounts.
+- Resolve configured relative mount paths from the selected workspace.
+
 - Add named containers, noninteractive stdin and explicit environment forwarding.
 
 - Add provided-tool inventories and required/relabel flags to toolset inspection.

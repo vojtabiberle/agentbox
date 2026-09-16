@@ -12,7 +12,7 @@ implemented support. No model credentials are stored in the repository.
 | 3. Private state | Shared state paths; location/size CLI; safe scoped reset; backup/restore guide. | Isolation, symlink safety, active-container refusal and restart tests. | Done: state CLI, leases, endpoint checks and tests |
 | 4. Toolset inspection | Optional provided-tools inventory; show required/relabel metadata. | Existing manifests compatible, inventories match installers, CLI tests. | Done: optional provides field and CLI metadata |
 | 5. Runtime controls | Named sessions, noninteractive CLI, explicit environment forwarding. | stdin and exit status preserved; no TTY in batch mode; validated names. | Done: batch/name/env controls with real runtime tests |
-| 6. Mount configuration | Typed per-toolset source overrides and explicit MCP config mounts. | Unknown overrides rejected; paths scoped consistently; no implicit secrets. | Pending |
+| 6. Mount configuration | Typed per-toolset source overrides and explicit MCP config mounts. | Unknown overrides rejected; paths scoped consistently; no implicit secrets. | Done: typed source overrides and MCP mounts |
 | 7. Additional toolsets | Terraform plus optional Kubernetes companion tools. | Reproducible installers and actual command startup checks. | Pending |
 | 8. Agents | Codex and Aider adapters/toolsets with provider setup documentation. | Isolated HOME, install/start/restart smoke; model tests where credentials permit. | Pending |
 | 9. Monorepos | Explicit project Dockerfile selection inside workspace. | Path confinement; build context/cache tests; default unchanged. | Pending |

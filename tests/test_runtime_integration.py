@@ -148,3 +148,30 @@ def test_batch_stdin_exit_code_and_forwarded_env(tmp_path, monkeypatch):
     )
     assert result.returncode == 42
     assert result.stdout == "input/forwarded"
+
+
+def test_explicit_mcp_mount_is_readonly(tmp_path):
+    runtime = ContainerRuntime(os.environ.get("AGENTBOX_TEST_RUNTIME", "podman"))
+    config_file = tmp_path / "mcp.json"
+    config_file.write_text('{"mcpServers": {}}')
+    config = Config(
+        state_dir=tmp_path / "state",
+        mcp_mounts=[
+            {"source": "mcp.json", "target": "/workspace/.mcp.json"},
+        ],
+    )
+    spec = prepare_run(
+        IMAGE,
+        tmp_path,
+        [],
+        [
+            "bash",
+            "-ec",
+            "cat /workspace/.mcp.json; if echo changed > /workspace/.mcp.json; then exit 1; fi",
+        ],
+        config,
+        interactive=False,
+    )
+    result = subprocess.run(runtime.build_command(spec), capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert config_file.read_text() == '{"mcpServers": {}}'

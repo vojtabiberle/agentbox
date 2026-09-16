@@ -155,7 +155,7 @@ def run(
         ro_mounts=ro_mounts,
         command=cmd,
         config=config,
-        mounts=builder.plugin_manager.get_all_mounts(),
+        mounts=builder.plugin_manager.get_all_mounts(config.toolset_mounts, workspace_path),
         environment=builder.plugin_manager.get_all_environment(),
         agent=agent_instance,
         git_worktree=git_worktree,

@@ -64,6 +64,7 @@ class ImageBuilder:
                     raise ImageBuildError(f"{path}: omit FROM; agentbox supplies the base image")
 
         self.plugin_manager.load(self.config.toolsets)
+        self.plugin_manager.get_all_mounts(self.config.toolset_mounts, self.workspace)
         dockerfile = self._render_dockerfile()
         image_name = self._compute_image_name(dockerfile)
         if force_rebuild or not self.runtime.image_exists(image_name):

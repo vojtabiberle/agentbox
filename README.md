@@ -644,3 +644,27 @@ its value is not embedded in container command arguments. The container runtime
 can still inspect its environment. Named containers must have unique names;
 agentbox never replaces an existing container. Names do not change the per-agent,
 per-workspace state identity. Completed foreground containers are removed.
+
+### Toolset paths and MCP configuration
+
+Override sources by toolset name and the target declared in its manifest. Targets
+and access policies remain unchanged. Explicit override sources must exist;
+relative paths resolve from the target workspace. Unknown toolsets/targets fail.
+
+```yaml
+toolsets: [base, cloud-aws]
+toolset_mounts:
+  cloud-aws:
+    /home/user/.aws: ./private/aws
+mcp_mounts:
+  - source: ./private/mcp.json
+    target: /workspace/.mcp.json
+```
+
+MCP mounts are opt-in, read-only and required by default. Use the configuration
+format and destination supported by the selected agent (the example supplies a
+project `.mcp.json`). Agentbox shares the file; it does not start host MCP servers
+or make host executables available inside the container. Server commands must be
+installed by toolsets/project Dockerfile, and provider credentials must be passed
+explicitly. Configured relative mount sources, including Claude paths, resolve
+from the target workspace. Avoid storing credential-bearing files in Git.

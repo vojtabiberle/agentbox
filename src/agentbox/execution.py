@@ -126,12 +126,19 @@ def prepare_run(
                     required=True,
                 )
             )
-    configured_mounts = [*(agent.get_mounts(config) if agent is not None else []), *(mounts or [])]
+    configured_mounts = [
+        *(agent.get_mounts(config) if agent is not None else []),
+        *(mounts or []),
+        *config.mcp_mounts,
+    ]
     for mount in configured_mounts:
         target = mount.target
         if target == "/home/user" or target.startswith("/home/user/"):
             target = host_home + target[len("/home/user") :]
-        requested.append(mount.model_copy(update={"target": target}))
+        source = Path(mount.source).expanduser()
+        if not source.is_absolute():
+            source = workspace / source
+        requested.append(mount.model_copy(update={"source": str(source), "target": target}))
 
     env = {
         "HOME": host_home,

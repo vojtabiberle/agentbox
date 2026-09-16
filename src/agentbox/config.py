@@ -7,6 +7,7 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError
 
 from agentbox.exceptions import ConfigError
+from agentbox.plugins.models import MountConfig
 
 
 class CredentialsConfig(BaseModel):
@@ -27,11 +28,19 @@ class ClaudeConfig(BaseModel):
     plugins_dir: Path | None = None
 
 
+class MCPMountConfig(MountConfig):
+    """Explicit MCP configuration file sharing; required and read-only by default."""
+
+    required: bool = True
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
     runtime: Literal["podman", "docker"] = "podman"
     toolsets: list[str] = Field(default_factory=lambda: ["base"])
+    toolset_mounts: dict[str, dict[str, Path]] = Field(default_factory=dict)
+    mcp_mounts: list[MCPMountConfig] = Field(default_factory=list)
     credentials: CredentialsConfig = Field(default_factory=CredentialsConfig)
     claude: ClaudeConfig = Field(default_factory=ClaudeConfig)
     image_name: str = "agentbox"
