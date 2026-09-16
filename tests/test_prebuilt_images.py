@@ -50,6 +50,8 @@ def test_cli_image_override(tmp_path, monkeypatch, command):
     from click.testing import CliRunner
     from agentbox.cli import main
     monkeypatch.chdir(tmp_path)
+    from pathlib import Path
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
     monkeypatch.setattr('agentbox.cli.ContainerRuntime', MagicMock())
     builder = MagicMock()
     builder.return_value.ensure_image.return_value = 'example:base'
@@ -57,3 +59,19 @@ def test_cli_image_override(tmp_path, monkeypatch, command):
     result = CliRunner().invoke(main, [command, '--image', 'example:base'])
     assert result.exit_code == 0, result.output
     assert builder.call_args.args[1].prebuilt_image == 'example:base'
+
+
+def test_real_prebuilt_extension(tmp_path):
+    import os
+    import subprocess
+    from agentbox.container import ContainerRuntime
+    runtime_name = os.environ.get('AGENTBOX_TEST_RUNTIME')
+    image = os.environ.get('AGENTBOX_TEST_IMAGE')
+    if runtime_name not in ('podman', 'docker') or not image:
+        pytest.skip('Set AGENTBOX_TEST_RUNTIME/IMAGE for real prebuilt extension test')
+    (tmp_path / 'Dockerfile.agentbox').write_text('COPY marker /opt/prebuilt-marker\n')
+    (tmp_path / 'marker').write_text('prebuilt-extension-ok')
+    runtime = ContainerRuntime(runtime_name)
+    built = ImageBuilder(runtime, Config(prebuilt_image=image), workspace=tmp_path).ensure_image()
+    result = subprocess.run([runtime_name, 'run', '--rm', built, 'cat', '/opt/prebuilt-marker'], check=True, capture_output=True, text=True)
+    assert result.stdout == 'prebuilt-extension-ok'
