@@ -89,7 +89,21 @@ project image builds pass against that daemon. If UID mapping needs changes,
 add regression coverage before marking support complete; otherwise document the
 remaining limitation without claiming rootless Docker support.
 
-### 3. Complete toolset inspection
+### 3. Manage private agent state
+
+- [ ] Show each workspace/agent HOME location and disk usage without exposing
+  credentials or session contents.
+- [ ] Document a backup/restore procedure, including moving a workspace, whose
+  resolved path determines its state identity.
+- [ ] Provide an explicit reset for one workspace/agent, with confirmation and
+  protection against deleting state used by a running container.
+
+Done when: users can locate and back up their state, restore it into the intended
+workspace/agent and verify persistence after restart. Reset must refuse active
+state, require confirmation, and leave other agents, workspaces and host files
+untouched. Tests must cover scope isolation and active-container refusal.
+
+### 4. Complete toolset inspection
 
 - [ ] Show `required` and `relabel` mount settings in `agentbox toolset NAME`.
 - [ ] Add a small structured inventory of provided tools to manifests and display it.
