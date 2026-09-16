@@ -11,8 +11,16 @@ from agentbox.cli import main
 from agentbox.config import Config
 from agentbox.container import ContainerRuntime
 from agentbox.exceptions import ConfigError
+from agentbox.execution import prepare_run
 from agentbox.image import ImageBuilder
 from agentbox.plugins import PluginManager
+
+
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    home = tmp_path / "host-home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: home)
 
 
 @pytest.mark.parametrize("runtime_name", ["podman", "docker"])
@@ -27,7 +35,10 @@ def test_home_is_private_persistent_and_scoped(tmp_path, monkeypatch, runtime_na
         runtime = ContainerRuntime(runtime_name)
 
         def run(workspace, agent):
-            runtime.run("test-image", workspace, [], ["bash"], config, agent=get_agent(agent))
+            workspace.mkdir(exist_ok=True)
+            runtime.run(
+                prepare_run("test-image", workspace, [], ["bash"], config, agent=get_agent(agent))
+            )
             command = execute.call_args.args[1]
             assert "--init" in command
             mounts = [command[i + 1] for i, arg in enumerate(command) if arg == "-v"]
@@ -57,7 +68,7 @@ def test_unwritable_state_fails_before_container_start(tmp_path):
     with patch("subprocess.run"), patch("os.execvp") as execute:
         runtime = ContainerRuntime("podman")
         with pytest.raises(ConfigError, match="Cannot create container HOME"):
-            runtime.run("image", tmp_path, [], ["bash"], Config(state_dir=state))
+            runtime.run(prepare_run("image", tmp_path, [], ["bash"], Config(state_dir=state)))
         execute.assert_not_called()
 
 
@@ -69,7 +80,7 @@ def test_agent_dependencies_and_mounts_are_separate(agent):
     assert [p.manifest.name for p in loaded] == ["base", agent]
     other = "hermes" if agent == "claude" else "claude"
     assert other not in [p.manifest.name for p in loaded]
-    assert selected.get_mounts(Config()) == []
+    assert all(m.target == "/etc/machine-id" for m in selected.get_mounts(Config()))
     if agent == "hermes":
         assert manager.get_all_environment()["TERMINAL_ENV"] == "local"
         assert manager.get_all_environment()["HERMES_HOME"].endswith("/.hermes")
@@ -91,9 +102,9 @@ def test_cli_resolves_agent_before_build(tmp_path, monkeypatch, subcommand):
         assert result.exit_code == 0, result.output
         assert builder.call_args.args[1].toolsets == ["base", "hermes"]
         if subcommand == "run":
-            kwargs = runtime.return_value.run.call_args.kwargs
-            assert kwargs["command"] == ["hermes", "setup", "--help"]
-            assert kwargs["agent"].name == "hermes"
+            spec = runtime.return_value.run.call_args.args[0]
+            assert spec.command == ("hermes", "setup", "--help")
+            assert not spec.share_hostname
 
 
 def test_unknown_agent_does_not_build(tmp_path, monkeypatch):

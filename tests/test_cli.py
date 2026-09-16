@@ -10,6 +10,13 @@ from agentbox.cli import main
 from agentbox.exceptions import RuntimeNotFoundError
 from agentbox.git import GitWorktreeInfo
 
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    home = tmp_path / "host-home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+
 
 @pytest.fixture
 def runner() -> CliRunner:
@@ -62,7 +69,7 @@ class TestRunCommand:
             # Should have called run with current directory
             mock_runtime.run.assert_called_once()
             call_kwargs = mock_runtime.run.call_args
-            assert call_kwargs[1]["workspace"] == tmp_path
+            assert call_kwargs.args[0].mounts[0].source == tmp_path
 
     def test_run_creates_missing_workspace_on_confirm(
         self,
@@ -123,7 +130,7 @@ class TestRunCommand:
 
             mock_runtime.run.assert_called_once()
             call_kwargs = mock_runtime.run.call_args
-            assert call_kwargs[1]["command"] == ["bash"]
+            assert call_kwargs.args[0].command == ("bash",)
 
     def test_run_with_read_only_mounts(
         self,
@@ -150,7 +157,7 @@ class TestRunCommand:
 
             mock_runtime.run.assert_called_once()
             call_kwargs = mock_runtime.run.call_args
-            assert ro_dir in call_kwargs[1]["ro_mounts"]
+            assert any(m.source == ro_dir and m.readonly for m in call_kwargs.args[0].mounts)
 
     def test_run_with_rebuild_flag(
         self,
@@ -186,7 +193,7 @@ class TestRunGitWorktree:
 
         with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
              patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
-             patch("agentbox.cli.detect_worktree") as mock_detect:
+             patch("agentbox.cli.detect_worktree", return_value=None) as mock_detect:
             mock_runtime = MagicMock()
             mock_runtime_cls.return_value = mock_runtime
 
@@ -211,7 +218,7 @@ class TestRunGitWorktree:
 
         with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
              patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
-             patch("agentbox.cli.detect_worktree") as mock_detect:
+             patch("agentbox.cli.detect_worktree", return_value=None) as mock_detect:
             mock_runtime = MagicMock()
             mock_runtime_cls.return_value = mock_runtime
 
@@ -234,7 +241,7 @@ class TestRunGitWorktree:
 
         with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
              patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
-             patch("agentbox.cli.detect_worktree"):
+             patch("agentbox.cli.detect_worktree", return_value=None):
             mock_runtime = MagicMock()
             mock_runtime_cls.return_value = mock_runtime
 
@@ -245,7 +252,7 @@ class TestRunGitWorktree:
             runner.invoke(main, ["run", "--no-git-mount"])
 
             mock_runtime.run.assert_called_once()
-            assert mock_runtime.run.call_args[1]["git_worktree"] is None
+            assert not any(m.target.endswith("/.git") for m in mock_runtime.run.call_args.args[0].mounts)
 
     def test_worktree_result_passed_to_runtime(
         self,
@@ -257,11 +264,12 @@ class TestRunGitWorktree:
         monkeypatch.chdir(tmp_path)
 
         worktree_info = GitWorktreeInfo(
-            git_common_dir=Path("/main/.git"),
-            git_dir=Path("/main/.git/worktrees/wt"),
+            git_common_dir=tmp_path / "main/.git",
+            git_dir=tmp_path / "main/.git/worktrees/wt",
             needs_mount=True,
         )
 
+        worktree_info.git_common_dir.mkdir(parents=True)
         with patch("agentbox.cli.ContainerRuntime") as mock_runtime_cls, \
              patch("agentbox.cli.ImageBuilder") as mock_builder_cls, \
              patch("agentbox.cli.detect_worktree", return_value=worktree_info):
@@ -275,7 +283,7 @@ class TestRunGitWorktree:
             runner.invoke(main, ["run"])
 
             mock_runtime.run.assert_called_once()
-            assert mock_runtime.run.call_args[1]["git_worktree"] is worktree_info
+            assert any(m.source == worktree_info.git_common_dir for m in mock_runtime.run.call_args.args[0].mounts)
 
 
 class TestBuildCommand:
@@ -340,7 +348,7 @@ class TestBuildCommand:
             # Verify ImageBuilder was called with workspace=cwd
             call_kwargs = mock_builder_cls.call_args
             assert "workspace" in call_kwargs[1], "ImageBuilder not called with workspace kwarg"
-            assert call_kwargs[1]["workspace"] == tmp_path
+            assert call_kwargs.kwargs["workspace"] == tmp_path
 
 
 class TestConfigCommand:
@@ -781,3 +789,33 @@ class TestMainHelp:
 
         assert result.exit_code == 0
         assert "agentbox" in result.output.lower()
+
+
+@pytest.mark.parametrize("caller_config", ["runtime: docker", "runtime: [invalid"])
+def test_run_uses_target_config_even_with_invalid_caller_config(tmp_path, monkeypatch, caller_config):
+    caller = tmp_path / "caller"
+    target = tmp_path / "target"
+    caller.mkdir()
+    target.mkdir()
+    (caller / ".agentbox.yaml").write_text(caller_config)
+    (target / ".agentbox.yaml").write_text("runtime: podman\ntoolsets: [python]")
+    monkeypatch.chdir(caller)
+    with patch("agentbox.cli.ContainerRuntime") as runtime, patch("agentbox.cli.ImageBuilder") as builder:
+        builder.return_value.ensure_image.return_value = "image"
+        result = CliRunner().invoke(main, ["run", str(target)])
+        assert result.exit_code == 0, result.exception
+        runtime.assert_called_once_with("podman")
+        assert builder.call_args.kwargs["config_path"] == target / ".agentbox.yaml"
+        assert builder.call_args.args[1].toolsets == ["python", "claude"]
+
+
+def test_invalid_target_config_fails_before_build(tmp_path, monkeypatch):
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / ".agentbox.yaml").write_text("runtime: [invalid")
+    monkeypatch.chdir(tmp_path)
+    with patch("agentbox.cli.ImageBuilder") as builder:
+        result = CliRunner().invoke(main, ["run", str(target)])
+        assert result.exit_code != 0
+        assert str(target / ".agentbox.yaml") in str(result.exception)
+        builder.assert_not_called()

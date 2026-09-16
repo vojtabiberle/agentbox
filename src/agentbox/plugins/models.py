@@ -16,6 +16,8 @@ class MountConfig(BaseModel):
 
     source: str = Field(description="Source path on host (supports ~ expansion)")
     target: str = Field(description="Target path in container")
+    required: bool = Field(default=False, description="Fail if source is missing")
+    relabel: bool = Field(default=True, description="Apply Podman SELinux relabeling")
     readonly: bool = Field(default=True, description="Whether mount is read-only")
     description: str | None = Field(default=None, description="Human-readable description")
 

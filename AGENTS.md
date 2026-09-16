@@ -23,8 +23,9 @@ calls separate from default CI; they require user-configured authentication.
 ## Architecture
 
 - `cli.py`: Click commands, agent selection, workspace and argument handling.
-- `config.py`: Pydantic models; cwd config takes precedence over global config.
-- `container.py`: runtime commands, mounts, UID mapping and private HOME creation.
+- `config.py`: Pydantic models; target workspace config takes precedence over global config.
+- `execution.py`: immutable run specification, private HOME and mount validation.
+- `container.py`: command rendering, UID mapping and process execution.
 - `git.py`: detects worktrees and required Git directory mounts.
 - `image.py`: resolves toolsets, renders Dockerfiles and computes image tags.
 - `agents/`: Agent interface and Claude/Hermes integrations.

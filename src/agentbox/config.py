@@ -38,18 +38,19 @@ class Config(BaseModel):
     state_dir: Path = Field(default_factory=lambda: Path.home() / ".local/state/agentbox")
 
 
-def get_config_paths() -> list[Path]:
+def get_config_paths(workspace: Path | None = None) -> list[Path]:
     """Return list of config file paths to check, in priority order."""
+    project = workspace if workspace is not None else Path.cwd()
     return [
-        Path.cwd() / ".agentbox.yaml",
-        Path.cwd() / ".agentbox.yml",
+        project / ".agentbox.yaml",
+        project / ".agentbox.yml",
         Path.home() / ".config" / "agentbox" / "config.yaml",
         Path.home() / ".config" / "agentbox" / "config.yml",
         Path.home() / ".agentbox.yaml",
     ]
 
 
-def load_config() -> tuple[Config, Path | None]:
+def load_config(workspace: Path | None = None) -> tuple[Config, Path | None]:
     """Load configuration from file or return defaults.
 
     Returns:
@@ -58,7 +59,7 @@ def load_config() -> tuple[Config, Path | None]:
     Raises:
         ConfigError: If config file exists but contains invalid configuration
     """
-    for path in get_config_paths():
+    for path in get_config_paths(workspace):
         if path.exists():
             try:
                 with open(path) as f:

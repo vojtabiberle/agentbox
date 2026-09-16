@@ -9,6 +9,7 @@ from rich.table import Table
 
 from . import __version__
 from .agents import get_agent
+from .agents.base import Agent
 from .config import (
     Config,
     get_config_paths,
@@ -20,11 +21,18 @@ from .config import (
 )
 from .container import ContainerRuntime
 from .exceptions import AgentboxError, ConfigError, PluginError
+from .execution import prepare_run
 from .git import GitWorktreeInfo, detect_worktree
 from .image import ImageBuilder
 from .plugins import PluginManager
 
 console = Console(stderr=True)
+
+
+def _with_agent_toolsets(config: Config, agent: Agent) -> Config:
+    return config.model_copy(
+        update={"toolsets": list(dict.fromkeys(config.toolsets + agent.get_required_toolsets()))}
+    )
 
 
 @click.group(invoke_without_command=True)
@@ -33,6 +41,10 @@ console = Console(stderr=True)
 def main(ctx: click.Context) -> None:
     """Run AI coding agents in isolated containers."""
     ctx.ensure_object(dict)
+
+    # Run must resolve its workspace before loading project configuration.
+    if ctx.invoked_subcommand == "run":
+        return
 
     # Commands that can run even with invalid config
     safe_commands = {"config", "upgrade"}
@@ -85,8 +97,8 @@ def run(
 
     WORKSPACE is the directory to mount read-write (default: current directory).
     """
-    config: Config = ctx.obj["config"]
-    workspace_path = Path(workspace).resolve()
+    workspace_path = Path(workspace).expanduser().resolve()
+    config, config_path = load_config(workspace_path)
 
     # Create workspace if it doesn't exist
     if not workspace_path.exists():
@@ -96,13 +108,7 @@ def run(
         console.print(f"[green]Created:[/green] {workspace_path}")
 
     agent_instance = get_agent(agent)
-    config = config.model_copy(
-        update={
-            "toolsets": list(
-                dict.fromkeys(config.toolsets + agent_instance.get_required_toolsets())
-            )
-        }
-    )
+    config = _with_agent_toolsets(config, agent_instance)
 
     if not workspace_path.is_dir():
         raise click.BadParameter("Workspace must be a directory", param_hint="workspace")
@@ -111,7 +117,6 @@ def run(
     runtime = ContainerRuntime(config.runtime)
 
     # Build image if needed (with workspace for plugin discovery)
-    config_path: Path | None = ctx.obj["config_path"]
     builder = ImageBuilder(runtime, config, workspace=workspace_path, config_path=config_path)
     image_name = builder.ensure_image(force_rebuild=rebuild)
 
@@ -119,9 +124,6 @@ def run(
     git_worktree: GitWorktreeInfo | None = None
     if not no_git_mount:
         git_worktree = detect_worktree(workspace_path)
-
-    # Get agent configuration
-    agent_instance = get_agent(agent)
 
     # Prepare read-only mounts
     ro_mounts = [Path(p).resolve() for p in ro]
@@ -135,16 +137,18 @@ def run(
     else:
         cmd = [*agent_instance.get_command(), *agent_args]
 
-    runtime.run(
+    spec = prepare_run(
         image=image_name,
         workspace=workspace_path,
         ro_mounts=ro_mounts,
         command=cmd,
         config=config,
-        plugin_manager=builder.plugin_manager,
+        mounts=builder.plugin_manager.get_all_mounts(),
+        environment=builder.plugin_manager.get_all_environment(),
         agent=agent_instance,
         git_worktree=git_worktree,
     )
+    runtime.run(spec)
 
 
 @main.command()
@@ -156,13 +160,7 @@ def build(ctx: click.Context, rebuild: bool, agent: str) -> None:
     config: Config = ctx.obj["config"]
     config_path: Path | None = ctx.obj["config_path"]
     agent_instance = get_agent(agent)
-    config = config.model_copy(
-        update={
-            "toolsets": list(
-                dict.fromkeys(config.toolsets + agent_instance.get_required_toolsets())
-            )
-        }
-    )
+    config = _with_agent_toolsets(config, agent_instance)
     runtime = ContainerRuntime(config.runtime)
     builder = ImageBuilder(runtime, config, workspace=Path.cwd(), config_path=config_path)
 

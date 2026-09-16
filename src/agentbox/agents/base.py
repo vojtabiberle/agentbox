@@ -11,6 +11,7 @@ class Agent(ABC):
 
     name: str
     description: str
+    share_hostname: bool = False
 
     @abstractmethod
     def get_command(self) -> list[str]:

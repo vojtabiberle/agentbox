@@ -2,21 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import subprocess
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from .config import Config
-from .exceptions import ConfigError, RuntimeNotFoundError
-from .git import GitWorktreeInfo
-from .plugins.models import MountConfig
-
-if TYPE_CHECKING:
-    from .agents.base import Agent
-    from .plugins import PluginManager
+from .exceptions import RuntimeNotFoundError
+from .execution import RunSpec
 
 
 class ContainerRuntime:
@@ -57,105 +49,36 @@ class ContainerRuntime:
             check=True,
         )
 
-    def run(
-        self,
-        image: str,
-        workspace: Path,
-        ro_mounts: list[Path],
-        command: list[str],
-        config: Config,
-        plugin_manager: PluginManager | None = None,
-        agent: Agent | None = None,
-        git_worktree: GitWorktreeInfo | None = None,
-    ) -> None:
-        """Run a container interactively."""
-        # Use host's home path for consistent identity
-        host_home = str(Path.home())
-
-        # Only this directory is mounted as HOME; host HOME stays private.
-        workspace_id = hashlib.sha256(str(workspace.resolve()).encode()).hexdigest()[:16]
-        home = (
-            config.state_dir.expanduser().resolve()
-            / workspace_id
-            / (agent.name if agent is not None else "shell")
-            / "home"
-        )
-        try:
-            home.mkdir(parents=True, exist_ok=True, mode=0o700)
-        except OSError as err:
-            raise ConfigError(f"Cannot create container HOME {home}: {err}") from err
-
-        # Build command
-        cmd = [
-            self.runtime,
-            "run",
-            "-it",
-            "--rm",
-            "--init",
-            "-v",
-            f"{workspace}:/workspace{self._vol_suffix()}",
-            "-v",
-            f"{home}:{host_home}{self._vol_suffix('rw')}",
-            "-w",
-            "/workspace",
-            "--uts=host",  # Share UTS namespace (hostname) with host
-            "-e",
-            f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-            "-e",
-            f"COLUMNS={self._get_terminal_columns()}",
-            "-e",
-            f"LINES={self._get_terminal_lines()}",
-            "-e",
-            f"HOME={host_home}",
-            "-e",
-            f"PATH={host_home}/.local/bin:/usr/local/bin:/usr/bin:/bin:{host_home}/.cargo/bin",
-        ]
-
-        # Mount host machine-id for consistent identity (needed for Claude statsig cache)
-        machine_id = Path("/etc/machine-id")
-        if machine_id.exists():
-            cmd.extend(["-v", f"{machine_id}:/etc/machine-id:ro"])
-
-        # Add runtime-specific options for rootless operation
-        if self.runtime == "podman":
-            cmd.extend(
-                [
-                    "--userns=keep-id",
-                    "--security-opt=no-new-privileges",
-                ]
-            )
-        elif self.runtime == "docker":
-            # Docker: run as current user to avoid root
-            cmd.extend(
-                [
-                    "--user",
-                    f"{os.getuid()}:{os.getgid()}",
-                ]
-            )
-
-        # Add read-only mounts
-        for i, ro_path in enumerate(ro_mounts):
-            cmd.extend(["-v", f"{ro_path}:/mnt/ro{i}{self._vol_suffix('ro')}"])
-
-        self._add_git_mounts(cmd, git_worktree)
-        if agent is not None:
-            self._add_mounts(cmd, agent.get_mounts(config))
-
-        # Add plugin mounts and environment (new system)
-        if plugin_manager is not None:
-            self._add_plugin_mounts(cmd, plugin_manager)
-            self._add_plugin_environment(cmd, plugin_manager)
-
-        # Add credential mounts (backward compatibility)
-        # This handles credentials: config section
-        self._add_credential_mounts(cmd, config)
-
-        # Add image and command
-        cmd.append(image)
-        cmd.extend(command)
-
-        # Replace current process with container
+    def run(self, spec: RunSpec) -> None:
+        """Replace this process with the prepared container."""
+        cmd = self.build_command(spec)
         os.execvp(cmd[0], cmd)
+
+    def build_command(self, spec: RunSpec) -> list[str]:
+        """Render runtime arguments without starting a container."""
+        cmd = [self.runtime, "run", "--rm", "--init"]
+        if spec.interactive:
+            cmd.append("-it")
+        cmd.extend(["-w", "/workspace"])
+        if spec.share_hostname:
+            cmd.append("--uts=host")
+        if self.runtime == "podman":
+            cmd.extend(["--userns=keep-id", "--security-opt=no-new-privileges"])
+        else:
+            cmd.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+        for mount in spec.mounts:
+            mode = "ro" if mount.readonly else "rw"
+            suffix = self._vol_suffix(mode) if mount.relabel else f":{mode}"
+            cmd.extend(["-v", f"{mount.source}:{mount.target}{suffix}"])
+        environment = {
+            "TERM": os.environ.get("TERM", "xterm-256color"),
+            "COLUMNS": self._get_terminal_columns(),
+            "LINES": self._get_terminal_lines(),
+            **dict(spec.environment),
+        }
+        for key, value in environment.items():
+            cmd.extend(["-e", f"{key}={value}"])
+        return [*cmd, spec.image, *spec.command]
 
     @staticmethod
     def _get_terminal_columns() -> str:
@@ -189,109 +112,3 @@ class ContainerRuntime:
             if mode:
                 return f":{mode}"
             return ""
-
-    def _add_git_mounts(self, cmd: list[str], git_worktree: GitWorktreeInfo | None) -> None:
-        """Add mounts for git worktree support.
-
-        Mounts the main repo's .git directory at its original host path
-        so that the .git file's gitdir: reference resolves inside the container.
-        """
-        if git_worktree is None or not git_worktree.needs_mount:
-            return
-
-        rw = self._vol_suffix("rw")
-        common = str(git_worktree.git_common_dir)
-        cmd.extend(["-v", f"{common}:{common}{rw}"])
-
-        # If git_dir is not under common_dir, mount it separately
-        git_dir = str(git_worktree.git_dir)
-        if not git_dir.startswith(common + "/") and git_dir != common:
-            cmd.extend(["-v", f"{git_dir}:{git_dir}{rw}"])
-
-    def _add_plugin_mounts(self, cmd: list[str], plugin_manager: PluginManager) -> None:
-        """Add mounts from loaded plugins."""
-        self._add_mounts(cmd, plugin_manager.get_all_mounts())
-
-    def _add_mounts(self, cmd: list[str], mounts: list[MountConfig]) -> None:
-        host_home = Path.home()
-
-        for mount in mounts:
-            # Expand ~ in source path
-            source = Path(mount.source).expanduser()
-
-            # Only mount if source exists
-            if not source.exists():
-                continue
-
-            # Expand ~ in target path (replace with actual home)
-            target = mount.target
-            if target.startswith("~"):
-                target = str(host_home) + target[1:]
-            elif "/home/user" in target:
-                # Also handle /home/user placeholder
-                target = target.replace("/home/user", str(host_home))
-
-            # Add mount
-            mode = "ro" if mount.readonly else "rw"
-            cmd.extend(["-v", f"{source}:{target}{self._vol_suffix(mode)}"])
-
-    def _add_plugin_environment(self, cmd: list[str], plugin_manager: PluginManager) -> None:
-        """Add environment variables from loaded plugins."""
-        host_home = Path.home()
-
-        for key, value in plugin_manager.get_all_environment().items():
-            # Expand /home/user placeholder in values
-            if "/home/user" in value:
-                value = value.replace("/home/user", str(host_home))
-            cmd.extend(["-e", f"{key}={value}"])
-
-    def _add_credential_mounts(self, cmd: list[str], config: Config) -> None:
-        """Add credential directory mounts based on config.
-
-        This method provides backward compatibility with the credentials:
-        config section. Consider using toolsets like cloud-aws, cloud-azure,
-        cloud-gcloud instead.
-        """
-        creds = config.credentials
-        host_home = Path.home()
-        ro = self._vol_suffix("ro")
-
-        # Track if any credential mounts are enabled for deprecation warning
-        has_cloud_creds = any([creds.azure, creds.aws, creds.gcloud])
-
-        if has_cloud_creds:
-            # Print deprecation warning to stderr (not stdout to avoid interfering with output)
-            print(
-                "Warning: The 'credentials:' config section is deprecated for "
-                "cloud credentials. Consider using toolsets instead:\n"
-                "  credentials: {aws: true} -> toolsets: [cloud-aws]\n"
-                "  credentials: {azure: true} -> toolsets: [cloud-azure]\n"
-                "  credentials: {gcloud: true} -> toolsets: [cloud-gcloud]",
-                file=sys.stderr,
-            )
-
-        if creds.github:
-            gh_config = host_home / ".config" / "gh"
-            if gh_config.exists():
-                cmd.extend(["-v", f"{gh_config}:{host_home}/.config/gh{ro}"])
-
-        if creds.azure:
-            azure_dir = host_home / ".azure"
-            if azure_dir.exists():
-                cmd.extend(["-v", f"{azure_dir}:{host_home}/.azure{ro}"])
-
-        if creds.aws:
-            aws_dir = host_home / ".aws"
-            if aws_dir.exists():
-                cmd.extend(["-v", f"{aws_dir}:{host_home}/.aws{ro}"])
-
-        if creds.gcloud:
-            gcloud_dir = host_home / ".config" / "gcloud"
-            if gcloud_dir.exists():
-                cmd.extend(["-v", f"{gcloud_dir}:{host_home}/.config/gcloud{ro}"])
-
-        if creds.ssh_agent:
-            ssh_sock = os.environ.get("SSH_AUTH_SOCK")
-            if ssh_sock and Path(ssh_sock).exists():
-                cmd.extend(["-v", f"{ssh_sock}:{ssh_sock}"])
-                cmd.extend(["-e", f"SSH_AUTH_SOCK={ssh_sock}"])

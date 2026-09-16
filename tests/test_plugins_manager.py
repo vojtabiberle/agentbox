@@ -469,3 +469,27 @@ class TestPluginManagerGetAllEnvironment:
         env = manager.get_all_environment()
 
         assert env == {}
+
+
+@pytest.mark.parametrize("dependencies", [
+    {"a": ["a"]},
+    {"a": ["b"], "b": ["a"]},
+    {"a": ["base", "b"], "b": ["c"], "c": ["b"], "base": []},
+])
+def test_cycles_fail_instead_of_silently_omitting_plugins(dependencies):
+    manager = PluginManager()
+    manager._available = {
+        name: create_test_plugin(name, depends_on=deps)
+        for name, deps in dependencies.items()
+    }
+    with pytest.raises(PluginDependencyError, match="circular dependency"):
+        manager.load(["a"])
+
+
+def test_duplicate_dependency_does_not_omit_plugin():
+    manager = PluginManager()
+    manager._available = {
+        "a": create_test_plugin("a", depends_on=["base", "base"]),
+        "base": create_test_plugin("base"),
+    }
+    assert [p.manifest.name for p in manager.load(["a"])] == ["base", "a"]

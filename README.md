@@ -188,7 +188,7 @@ git worktree remove ~/worktrees/myproject/feature-auth
 ## Configuration
 
 agentbox looks for configuration in this order:
-1. `.agentbox.yaml` or `.agentbox.yml` in the current directory (project config)
+1. `.agentbox.yaml` or `.agentbox.yml` in the target workspace for `run`, otherwise the current directory (project config)
 2. `~/.config/agentbox/config.yaml` or `config.yml` (global config)
 3. `~/.agentbox.yaml` (legacy global config)
 
@@ -386,7 +386,9 @@ dockerfile: |
 mounts:
   - source: ~/.my-config        # Host path (~ expanded)
     target: /home/user/.my-config  # Container path
-    readonly: true              # Optional, default: false
+    readonly: true              # Optional, default: true
+    required: false             # Optional, fail if source is missing when true
+    relabel: true               # Optional, Podman SELinux relabeling
     description: My tool config # Optional, for documentation
 
 # Optional: environment variables to set
@@ -394,6 +396,12 @@ environment:
   MY_VAR: some-value
   MY_CONFIG: /home/user/.my-config
 ```
+
+Mounts with missing sources are skipped unless `required: true`. Explicit Claude
+`global_claude_md` and `plugins_dir` paths are required. Identical mounts are
+deduplicated; conflicting mounts at the same container path fail before startup.
+Nested mounts remain supported, for example private HOME with a shared config
+subdirectory. Host hostname and `/etc/machine-id` are shared only for Claude.
 
 ### Example: Custom Node.js Toolset
 

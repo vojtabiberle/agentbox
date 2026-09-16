@@ -122,13 +122,13 @@ class PluginManager:
             if chain is None:
                 chain = []
 
-            if name in visited_for_collection:
-                return
-
             if name in chain:
                 # Circular dependency detected
                 cycle = " -> ".join(chain + [name])
                 raise PluginDependencyError(name, f"circular dependency: {cycle}")
+
+            if name in visited_for_collection:
+                return
 
             if name not in self._available:
                 # Find which plugin required this missing dependency
@@ -139,7 +139,7 @@ class PluginManager:
             needed.add(name)
 
             plugin = self._available[name]
-            for dep in plugin.manifest.depends_on:
+            for dep in dict.fromkeys(plugin.manifest.depends_on):
                 collect(dep, chain + [name])
 
         for name in toolset_names:
@@ -150,7 +150,7 @@ class PluginManager:
         in_degree: dict[str, int] = {name: 0 for name in needed}
         for name in needed:
             plugin = self._available[name]
-            for dep in plugin.manifest.depends_on:
+            for dep in dict.fromkeys(plugin.manifest.depends_on):
                 if dep in needed:
                     in_degree[name] += 1
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Resolve `run` project configuration from the target workspace, including when
+  the invoking directory has an invalid configuration.
+- Reject cyclic toolset dependencies and handle repeated dependency names.
+- Separate immutable run specifications and command rendering from execution.
+- Validate required mount sources, deduplicate identical mounts and reject
+  conflicting targets. Explicit Claude file/plugin paths must exist.
+- Keep hostname and machine-id sharing specific to Claude.
+
 ## 0.2.0 — 2026-09-16
 
 ### Migration

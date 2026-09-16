@@ -10,6 +10,7 @@ from .base import Agent
 class ClaudeAgent(Agent):
     """Claude Code agent configuration."""
 
+    share_hostname = True
     name = "claude"
     description = "Anthropic's Claude Code AI assistant"
 
@@ -22,7 +23,7 @@ class ClaudeAgent(Agent):
         return ["claude"]
 
     def get_mounts(self, config: Config) -> list[MountConfig]:
-        mounts = []
+        mounts = [MountConfig(source="/etc/machine-id", target="/etc/machine-id", relabel=False)]
         if config.claude.share_host_config:
             for name in (".claude", ".claude.json"):
                 mounts.append(
@@ -33,5 +34,5 @@ class ClaudeAgent(Agent):
             (config.claude.plugins_dir, "~/.claude/plugins"),
         ):
             if source is not None:
-                mounts.append(MountConfig(source=str(source), target=target))
+                mounts.append(MountConfig(source=str(source), target=target, required=True))
         return mounts

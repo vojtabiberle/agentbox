@@ -8,6 +8,7 @@ import pytest
 from agentbox.agents import get_agent
 from agentbox.config import Config
 from agentbox.container import ContainerRuntime
+from agentbox.execution import prepare_run
 from agentbox.plugins import PluginManager
 
 IMAGE = os.environ.get("AGENTBOX_TEST_IMAGE")
@@ -25,7 +26,6 @@ def test_home_and_hermes_survive_container_restart(tmp_path, monkeypatch):
 
     def execute(_binary, command):
         # Tests have no interactive terminal; all other runtime arguments are real.
-        command.remove("-it")
         result = subprocess.run(command, capture_output=True, text=True, timeout=120)
         assert result.returncode == 0, result.stdout + result.stderr
 
@@ -33,13 +33,17 @@ def test_home_and_hermes_survive_container_restart(tmp_path, monkeypatch):
 
     def run(script, selected=agent, directory=workspace):
         runtime.run(
-            IMAGE,
-            directory,
-            [],
-            ["bash", "-ec", script],
-            config,
-            plugin_manager=plugins if selected.name == "hermes" else None,
-            agent=selected,
+            prepare_run(
+                IMAGE,
+                directory,
+                [],
+                ["bash", "-ec", script],
+                config,
+                mounts=plugins.get_all_mounts() if selected.name == "hermes" else [],
+                environment=plugins.get_all_environment() if selected.name == "hermes" else {},
+                interactive=False,
+                agent=selected,
+            )
         )
 
     run(
@@ -76,7 +80,6 @@ def test_corepack_yarn_cache_survives_restart(tmp_path, monkeypatch):
     config = Config(state_dir=tmp_path / "state")
 
     def execute(_binary, command):
-        command.remove("-it")
         result = subprocess.run(command, capture_output=True, text=True, timeout=120)
         assert result.returncode == 0, result.stdout + result.stderr
 
@@ -86,5 +89,13 @@ def test_corepack_yarn_cache_survives_restart(tmp_path, monkeypatch):
         "COREPACK_ENABLE_NETWORK=0 corepack yarn --version",
     ):
         runtime.run(
-            IMAGE, workspace, [], ["bash", "-ec", script], config, agent=get_agent("hermes")
+            prepare_run(
+                IMAGE,
+                workspace,
+                [],
+                ["bash", "-ec", script],
+                config,
+                agent=get_agent("hermes"),
+                interactive=False,
+            )
         )
