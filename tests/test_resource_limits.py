@@ -14,7 +14,7 @@ from agentbox.container import ContainerRuntime
 from agentbox.execution import prepare_run
 
 
-@pytest.mark.parametrize('limits', [{'memory':'-1g'}, {'memory':'1g --privileged'}, {'memory':'0'}, {'cpus':0}, {'cpus':float('inf')}, {'cpus':float('nan')}, {'pids_limit':-1}, {'pids_limit':True}, {'network':'host'}])
+@pytest.mark.parametrize('limits', [{'pids':32}, {'memory':'-1g'}, {'memory':'1g --privileged'}, {'memory':'0'}, {'cpus':0}, {'cpus':float('inf')}, {'cpus':float('nan')}, {'pids_limit':-1}, {'pids_limit':True}, {'network':'host'}])
 def test_invalid_limits_rejected(limits):
     with pytest.raises(ValidationError):
         Config(limits=limits)

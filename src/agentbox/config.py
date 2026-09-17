@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from agentbox.exceptions import ConfigError
 from agentbox.plugins.models import MountConfig
@@ -36,6 +36,8 @@ class MCPMountConfig(MountConfig):
 
 class RuntimeLimits(BaseModel):
     """Optional container resource controls; omitted limits use engine defaults."""
+
+    model_config = ConfigDict(extra="forbid")
 
     memory: str | None = Field(default=None, pattern=r"^[1-9][0-9]*[bBkKmMgG]?$", strict=True)
     cpus: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)

@@ -828,7 +828,8 @@ workspace configuration. Omitted limits keep engine defaults; `network: default`
 keeps normal engine networking. `none` disables external network access, including
 model APIs and package downloads; loopback remains available. Limits constrain the
 running container, not image builds. Memory accepts positive bytes or b/k/m/g units;
-CPU quotas must be positive and finite, PID limits positive integers.
+CPU quotas must be positive and finite, PID limits positive integers. Unknown limit
+keys are rejected. In YAML, quote a memory value expressed as a bare byte count.
 
 Actual enforcement requires runtime/cgroup support. Engine errors are surfaced;
 agentbox never silently drops requested limits. `--dry-run` includes resolved limits.
