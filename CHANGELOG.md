@@ -8,6 +8,10 @@
 - Exercise Git LFS roundtrips, YAML parsing and offline npm/pip installs before publishing.
 
 
+Validation: 420 local tests passed (90% coverage). Each rebuilt stack has zero
+Critical findings; the remaining three High and two Unknown module matches are
+assessed in [the security report](docs/SECURITY_ASSESSMENT.md). Raw findings remain visible.
+
 ## 0.4.0 — 2026-09-17
 
 - Remove timed-out probe containers and report cleanup failures explicitly.

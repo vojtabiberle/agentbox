@@ -48,3 +48,9 @@ clean package installation and published image reports/attestations.
 4. Run Python CI and real runtime checks; commit, PR and merge after verification, then publish patched images/release.
 
 Acceptance: no Critical findings in the three rebuilt images; any remaining findings explicitly assessed with version-scoped evidence. No paid model calls.
+
+Delivered in v0.4.1: all three local scans report 0 Critical / 3 High / 0 Medium /
+0 Low / 2 Unknown findings. The five residual Go module matches have exact-version
+source dependency evidence in [the assessment](SECURITY_ASSESSMENT.md).
+420 local tests passed (90% coverage); offline tool operations and Claude startup
+passed on all three rebuilt stacks. PR #46 contains the fixes and CI verification.
