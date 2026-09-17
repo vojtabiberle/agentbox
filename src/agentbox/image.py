@@ -50,7 +50,7 @@ class ImageBuilder:
                 lstrip_blocks=True,
             )
 
-    def ensure_image(self, force_rebuild: bool = False) -> str:
+    def ensure_image(self, force_rebuild: bool = False, *, dry_run: bool = False) -> str:
         """Build the toolset image and optional workspace extension."""
         extension = None
         if self.workspace is not None:
@@ -74,17 +74,17 @@ class ImageBuilder:
             image_name = self.config.prebuilt_image
             if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/:@-]*", image_name):
                 raise ImageBuildError("Invalid prebuilt image reference")
-            if force_rebuild or not self.runtime.image_exists(image_name):
+            if not dry_run and (force_rebuild or not self.runtime.image_exists(image_name)):
                 self.runtime.pull(image_name)
         else:
             dockerfile = self._render_dockerfile()
             image_name = self._compute_image_name(dockerfile)
-            if force_rebuild or not self.runtime.image_exists(image_name):
+            if not dry_run and (force_rebuild or not self.runtime.image_exists(image_name)):
                 console.print(f"[cyan]Building {image_name} image...[/cyan]")
                 self.runtime.build(dockerfile, image_name)
                 console.print("[green]Image built successfully.[/green]")
 
-        if extension is None:
+        if extension is None or dry_run:
             return image_name
 
         assert self.workspace is not None

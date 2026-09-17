@@ -789,3 +789,16 @@ receive upstream package/security updates. Builds smoke-test each stack before p
 and pull the registry artifact for a second startup check. Images contain tools only;
 no model or cloud credentials are provided to this workflow. ARM64 requires local
 builds until a native ARM64 publishing/test runner is added.
+
+### Diagnostics and preview
+
+`agentbox doctor WORKSPACE --agent hermes` checks configuration, runtime connectivity,
+mount sources, host directory permissions and the selected executable in a cached
+base image. Its temporary check container has no host mounts, no network and a
+read-only root. It does not test provider login or build project extensions.
+
+`agentbox run WORKSPACE --dry-run` outputs a JSON access plan without creating HOME,
+building/pulling images or starting containers. Environment values and agent argument
+values are omitted; only names and argument count are shown. The base image is shown;
+project extensions are resolved during execution. Required external mounts are still
+validated. A missing workspace must be created explicitly before previewing.

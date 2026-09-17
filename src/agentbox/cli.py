@@ -20,6 +20,7 @@ from .config import (
     save_project_config,
 )
 from .container import ContainerRuntime
+from .diagnostics import describe_run, doctor
 from .exceptions import AgentboxError, ConfigError, PluginError
 from .execution import prepare_run
 from .git import GitWorktreeInfo, detect_worktree
@@ -45,7 +46,7 @@ def main(ctx: click.Context) -> None:
     ctx.ensure_object(dict)
 
     # Run must resolve its workspace before loading project configuration.
-    if ctx.invoked_subcommand in {"run", "state", "service"}:
+    if ctx.invoked_subcommand in {"run", "state", "service", "doctor"}:
         return
 
     # Commands that can run even with invalid config
@@ -70,6 +71,7 @@ def main(ctx: click.Context) -> None:
         click.echo(ctx.get_help())
 
 
+main.add_command(doctor)
 main.add_command(state)
 main.add_command(service)
 
@@ -93,6 +95,9 @@ main.add_command(service)
 @click.option(
     "--dockerfile", type=click.Path(path_type=Path), help="Project Dockerfile inside workspace"
 )
+@click.option(
+    "--dry-run", is_flag=True, help="Preview mounts and environment names without changes"
+)
 @click.option("--non-interactive", is_flag=True, help="Attach stdin without allocating a TTY")
 @click.option(
     "--env", "forwarded_env", multiple=True, help="Forward a named host environment variable"
@@ -111,6 +116,7 @@ def run(
     dockerfile: Path | None,
     image: str | None,
     non_interactive: bool,
+    dry_run: bool,
     forwarded_env: tuple[str, ...],
 ) -> None:
     """Run an agent in an isolated container.
@@ -125,6 +131,8 @@ def run(
         config = config.model_copy(update={"project_dockerfile": dockerfile})
 
     # Create workspace if it doesn't exist
+    if not workspace_path.exists() and dry_run:
+        raise click.BadParameter("Workspace must exist for dry-run", param_hint="workspace")
     if not workspace_path.exists():
         if not click.confirm(f"Directory doesn't exist. Create it?\n  {workspace_path}"):
             raise SystemExit(1)
@@ -142,7 +150,11 @@ def run(
 
     # Build image if needed (with workspace for plugin discovery)
     builder = ImageBuilder(runtime, config, workspace=workspace_path, config_path=config_path)
-    image_name = builder.ensure_image(force_rebuild=rebuild)
+    image_name = (
+        builder.ensure_image(force_rebuild=rebuild, dry_run=True)
+        if dry_run
+        else builder.ensure_image(force_rebuild=rebuild)
+    )
 
     # Detect git worktree
     git_worktree: GitWorktreeInfo | None = None
@@ -153,7 +165,8 @@ def run(
     ro_mounts = [Path(p).resolve() for p in ro]
 
     # Print banner
-    _print_banner(workspace_path, ro_mounts, bash, agent, git_worktree)
+    if not dry_run:
+        _print_banner(workspace_path, ro_mounts, bash, agent, git_worktree)
 
     # Run container
     if bash:
@@ -175,7 +188,11 @@ def run(
         interactive=not non_interactive,
         stdin=non_interactive,
         forwarded_env=forwarded_env,
+        dry_run=dry_run,
     )
+    if dry_run:
+        describe_run(spec, config, workspace_path)
+        return
     runtime.run(spec)
 
 

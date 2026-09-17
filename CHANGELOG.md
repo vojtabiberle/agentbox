@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add doctor checks and a side-effect-free, redacted run preview.
+- Omit YAML source excerpts from configuration parse errors.
+
 ## 0.3.1 — 2026-09-17
 
 - Replace end-of-life Fedora 42 with supported Fedora 44 for new image builds.

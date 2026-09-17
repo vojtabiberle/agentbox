@@ -42,12 +42,14 @@ class RunSpec:
     forwarded_env: tuple[str, ...] = ()
 
 
-def resolve_mounts(mounts: list[MountConfig]) -> tuple[Mount, ...]:
+def resolve_mounts(
+    mounts: list[MountConfig], *, planned_sources: tuple[Path, ...] = ()
+) -> tuple[Mount, ...]:
     """Normalize paths, skip optional sources and reject conflicting targets."""
     resolved: dict[str, Mount] = {}
     for mount in mounts:
         source = Path(mount.source).expanduser().resolve()
-        if not source.exists():
+        if not source.exists() and source not in planned_sources:
             if mount.required:
                 raise ConfigError(f"Required mount source does not exist: {source}")
             continue
@@ -82,6 +84,7 @@ def prepare_run(
     name: str | None = None,
     stdin: bool = False,
     forwarded_env: tuple[str, ...] = (),
+    dry_run: bool = False,
 ) -> RunSpec:
     """Prepare private HOME and validate all mount sources before execution."""
     if name is not None and not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*", name):
@@ -95,7 +98,8 @@ def prepare_run(
     host_home = str(Path.home())
     home = state_home(config.state_dir, workspace, agent.name if agent is not None else "shell")
     try:
-        home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not dry_run:
+            home.mkdir(parents=True, exist_ok=True, mode=0o700)
     except OSError as err:
         raise ConfigError(f"Cannot create container HOME {home}: {err}") from err
 
@@ -181,7 +185,7 @@ def prepare_run(
         stdin=stdin,
         forwarded_env=tuple(dict.fromkeys(forwarded_env)),
         command=tuple(command),
-        mounts=resolve_mounts(requested),
+        mounts=resolve_mounts(requested, planned_sources=(home,) if dry_run else ()),
         environment=tuple(env.items()),
         interactive=interactive,
         share_hostname=agent.share_hostname if agent is not None else False,

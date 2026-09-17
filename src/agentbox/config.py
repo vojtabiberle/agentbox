@@ -77,9 +77,11 @@ def load_config(workspace: Path | None = None) -> tuple[Config, Path | None]:
                     data = yaml.safe_load(f) or {}
                 return Config.model_validate(data), path
             except yaml.YAMLError as e:
+                line = getattr(getattr(e, "problem_mark", None), "line", None)
+                location = str(line + 1) if isinstance(line, int) else "unknown"
                 raise ConfigError(
                     f"Invalid YAML in config file: {path}\n"
-                    f"  Error: {e}\n"
+                    f"  Syntax error at line {location}\n"
                     f"  Fix the syntax or run 'agentbox config init --force' to recreate"
                 ) from None
             except ValidationError as e:
