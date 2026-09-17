@@ -79,6 +79,13 @@ Final local verification: 453 tests passed with all optional container suites en
 (85% coverage); 33 server tests also pass with resource warnings treated as errors.
 Wheel and source distribution build successfully; Terraform caches/state are excluded.
 
-External acceptance remains open: the user has not created the DEV GCP project or
-GitHub App. No project resources, live provider calls or external comments were created.
-A restricted DEV token in Secret Manager is supported for the forthcoming pilot.
+DEV pilot (2026-09-17): user-authorized GCP project and Secret Manager credentials
+were provisioned. The first image build exposed an inherited inaccessible SSH working
+directory when switching to the runner user; provisioning/readiness/stop scripts now
+change to an accessible directory first. The corrected image built in 6m29s and booted
+as a new private VM. IAP, host UID network denial (including metadata), container
+isolation, SSH settings, upgrade timers and persistent stop across reboot passed.
+A live synthetic Claude Haiku request through the broker completed in 5.3s. No
+external GitHub comments were created. GitHub review acceptance currently stops at
+HTTP 404 with the DEV token; repository access, rotation and timed one-command
+onboarding remain open. Pilot VMs used two-hour maximum runtimes and staged startup.

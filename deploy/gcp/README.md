@@ -1,8 +1,11 @@
 # Private GCP runner (preview)
 
-Implementation and local security tests are available. **No GCP image has yet been
-built or deployed in a real project, and no live GitHub/model review has been run.**
-The 15-minute onboarding target remains an acceptance criterion, not a measured result.
+Implementation and local security tests are available. A DEV pilot on 2026-09-17
+built and booted the image, verified IAP, container/host isolation, persistent stop
+across reboot and a live Claude Haiku request through the broker. GitHub review
+acceptance remains pending repository access for the DEV token (HTTP 404).
+The 15-minute onboarding target remains an acceptance criterion, not a measured result;
+the pilot used staged deployment with automatic workloads stopped.
 
 The image is built once by maintainers. An end user selects the approved image and
 supplies identifiers in a small JSON config, then runs:

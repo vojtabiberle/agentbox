@@ -6,6 +6,7 @@ systemctl is-active --quiet agentbox-broker.service
 systemctl is-active --quiet agentbox-review.timer
 test -S /run/agentbox-broker/proxy.sock
 test -S /run/agentbox-broker/control.sock
+cd /
 runuser -u agentbox-runner -- env HOME=/var/lib/agentbox-runner XDG_RUNTIME_DIR=/run/user/1001 \
     /opt/agentbox/bin/python - <<'PY'
 from pathlib import Path

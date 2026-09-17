@@ -47,6 +47,7 @@ loginctl enable-linger agentbox-runner
 systemctl start user@1001.service
 # Preload the reviewed workload image before enabling the runner's IP deny rule.
 nft delete table inet agentbox
+cd /var/lib/agentbox-runner
 runuser -u agentbox-runner -- env HOME=/var/lib/agentbox-runner XDG_RUNTIME_DIR=/run/user/1001 \
     podman pull "$AGENTBOX_WORKLOAD_IMAGE"
 nft -f /etc/nftables.conf

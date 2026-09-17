@@ -8,8 +8,10 @@
 - Add private GCP Packer/Terraform deployment, systemd supervision, host UID firewall and persistent kill switch.
 - Add adversarial boundary tests and an actual offline Claude Code/SSE compatibility test.
 
-GCP image build/deployment and authenticated GitHub/model acceptance are pending a DEV
-project and configured secrets. Cost reservations require administrator-reviewed pricing;
+- Fix inherited working directories for rootless provisioning and host control scripts.
+
+DEV image build/deployment, isolation, reboot/stop and a live model probe passed.
+GitHub review and timed onboarding acceptance remain pending. Cost reservations require administrator-reviewed pricing;
 they are not a universal provider billing guarantee. See the deployment guide/threat model.
 
 

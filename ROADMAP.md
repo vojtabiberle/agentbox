@@ -107,7 +107,6 @@ remaining findings and update instructions. Raw findings remain visible.
 - [x] Scheduled review reference: trusted polling, repository-scoped GitHub App access, SHA deduplication and adversarial acceptance tests.
 - [x] Threat model and operating guide, with explicit local/cloud verification evidence.
 
-Cloud deployment, provider calls and the 15-minute onboarding target require a selected
-GCP project and configured GitHub/model credentials; they are not implied by unit tests.
-
-- [ ] DEV acceptance: bake/deploy actual GCP image, verify IAP/reboot/rotation and a live review; measure onboarding time. Waiting for DEV project and configured secrets.
+- [x] DEV infrastructure acceptance (2026-09-17): actual image build/deploy, IAP, non-root networkless container, read-only root, temporary HOME, runner UID denial of metadata/internet, persistent kill switch across reboot, disabled password/root SSH and enabled upgrade timers.
+- [x] Live provider probe: Claude Code → Unix broker → Anthropic Haiku, with Secret Manager credentials outside the workload.
+- [ ] Complete DEV acceptance: repository-authorized GitHub token, live review, secret rotation and measured one-command onboarding within 15 minutes. Current DEV token returns HTTP 404 for the selected repository PR.
