@@ -64,6 +64,7 @@ include = [
     "CHANGELOG.md",
     "tests/**",
     "scripts/**",
+    "docs/**",
 ]
 
 [tool.pytest.ini_options]
