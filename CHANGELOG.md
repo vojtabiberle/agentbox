@@ -5,6 +5,7 @@
 - Remove timed-out probe containers and report cleanup failures explicitly.
 - Validate executable compatibility before launching prebuilt images.
 - Publish image inventories, vulnerability reports and signed provenance/SBOM attestations.
+- Apply available Fedora updates during image builds.
 - Use checksum-pinned Syft/Grype with Fedora coverage and require complete RPM inventories.
 
 - Add validated memory/CPU/PID limits and optional offline networking for runs/services.

@@ -24,7 +24,12 @@ def verify(root: Path) -> str:
     }
     if not installed or not installed <= cataloged or not installed <= attested:
         raise ValueError("SBOM omits installed RPM names/versions; refusing publication")
-    if scan.get("distro", {}).get("id") != "fedora":
+    distro = scan.get("distro", {})
+    database = scan.get("descriptor", {}).get("db", {})
+    if (distro.get("name") != "fedora"
+            or distro.get("version") != syft.get("distro", {}).get("versionID")
+            or not database.get("status", {}).get("valid")
+            or "fedora" not in database.get("providers", {})):
         raise ValueError("Vulnerability report does not identify Fedora; refusing publication")
     counts = Counter(match["vulnerability"]["severity"] for match in scan["matches"])
     return f"Verified {len(installed)} RPM packages in both inventories. Findings (report-only): {dict(counts)}"
