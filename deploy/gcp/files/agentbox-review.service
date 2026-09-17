@@ -1,0 +1,25 @@
+[Unit]
+Description=Agentbox scheduled review
+After=agentbox-broker.service nftables.service
+Requires=agentbox-broker.service nftables.service
+ConditionPathExists=/etc/agentbox/review.yaml
+ConditionPathExists=!/etc/agentbox/STOP
+
+[Service]
+Type=oneshot
+User=agentbox-runner
+Group=agentbox
+Environment=HOME=/var/lib/agentbox-runner
+Environment=XDG_RUNTIME_DIR=/run/user/1001
+ExecStart=/opt/agentbox/bin/agentbox server review-once
+TimeoutStartSec=1800
+TimeoutStopSec=30
+KillMode=mixed
+StateDirectory=agentbox-runner
+StateDirectoryMode=0700
+UMask=0077
+LimitCORE=0
+# Podman's newuidmap/newgidmap helpers need their normal setuid behavior.
+# The workload itself gets no-new-privileges and an empty capability set.
+Delegate=yes
+MemorySwapMax=0

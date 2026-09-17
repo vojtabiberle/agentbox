@@ -68,3 +68,17 @@ implemented together because their capability boundary is tested end-to-end. 32 
 tests passed, including real Podman network/filesystem/UID checks, timeout/output cleanup
 and the actual container-to-Unix bridge. GitHub signing/provider calls use test doubles;
 no external comments or paid requests were sent. Deployment is a separate PR.
+
+Deployment milestone: Packer recipe and private-VM Terraform module implemented;
+Terraform validate plus mocked network/VM assertions and Packer validate pass.
+The single deployment wrapper includes readiness checks; systemd units, persistent
+kill switch, host UID egress denial, Secret Manager IAM and DEV PAT/App modes are
+documented. Real Claude Code completed an offline review against a local mocked
+Anthropic endpoint, exercising its actual request shape and SSE response.
+Final local verification: 453 tests passed with all optional container suites enabled
+(85% coverage); 33 server tests also pass with resource warnings treated as errors.
+Wheel and source distribution build successfully; Terraform caches/state are excluded.
+
+External acceptance remains open: the user has not created the DEV GCP project or
+GitHub App. No project resources, live provider calls or external comments were created.
+A restricted DEV token in Secret Manager is supported for the forthcoming pilot.

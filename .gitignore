@@ -22,3 +22,11 @@ build/
 # Local config
 .env
 .claude/settings.local.json
+
+# Deployment state and local runner configuration
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars.json
+!*.example.tfvars.json

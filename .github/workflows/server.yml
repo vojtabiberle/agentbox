@@ -1,0 +1,55 @@
+name: Server Boundary
+on:
+  pull_request:
+    paths: ['src/agentbox/**', 'tests/test_server.py', 'tests/test_server_claude.py', 'tests/test_broker.py', 'tests/test_review.py', 'deploy/**', '.github/workflows/server.yml']
+  push:
+    branches: [main]
+    paths: ['src/agentbox/**', 'tests/test_server.py', 'tests/test_server_claude.py', 'tests/test_broker.py', 'tests/test_review.py', 'deploy/**', '.github/workflows/server.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev]'
+      - name: Install rootless Podman
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs nftables
+          sudo mkdir -p "/etc/systemd/system/user@$(id -u).service.d"
+          printf '[Service]\nDelegate=cpu cpuset io memory pids\n' | sudo tee "/etc/systemd/system/user@$(id -u).service.d/delegate.conf"
+          sudo systemctl daemon-reload
+          sudo loginctl enable-linger "$(id -un)"
+          sudo systemctl restart "user@$(id -u).service"
+          mkdir -p ~/.config/containers
+          printf '[engine]\nevents_logger="file"\n' > ~/.config/containers/containers.conf
+      - name: Pull approved test image and exercise boundaries
+        env:
+          AGENTBOX_SERVER_TEST_IMAGE: ghcr.io/vojtabiberle/agentbox@sha256:abdc11d0dff2d3a9525a8174b8ba056c25234df22dd1980cd286692692262570
+        run: |
+          podman pull "$AGENTBOX_SERVER_TEST_IMAGE"
+          pytest -q tests/test_server.py tests/test_server_claude.py tests/test_broker.py tests/test_review.py
+      - name: Validate unit syntax with installed executable
+        run: |
+          sudo mkdir -p /opt/agentbox/bin
+          sudo ln -s "$(command -v agentbox)" /opt/agentbox/bin/agentbox
+          systemd-analyze verify deploy/gcp/files/*.service deploy/gcp/files/*.timer
+  infrastructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0
+      - run: terraform -chdir=deploy/gcp/terraform fmt -check
+      - run: terraform -chdir=deploy/gcp/terraform init -backend=false -input=false
+      - run: terraform -chdir=deploy/gcp/terraform validate
+      - run: terraform -chdir=deploy/gcp/terraform test
+      - run: bash -n deploy/gcp/deploy deploy/gcp/image/provision.sh deploy/gcp/terraform/startup.sh.tftpl

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0a1 — always-on preview
+
+- Add administrator-owned server policy and networkless non-root batch execution.
+- Add a Unix egress/model broker with external Secret Manager credentials, atomic budget reservations and a separate GitHub controller capability.
+- Add a scheduled Claude Code review example with durable SHA deduplication.
+- Add private GCP Packer/Terraform deployment, systemd supervision, host UID firewall and persistent kill switch.
+- Add adversarial boundary tests and an actual offline Claude Code/SSE compatibility test.
+
+GCP image build/deployment and authenticated GitHub/model acceptance are pending a DEV
+project and configured secrets. Cost reservations require administrator-reviewed pricing;
+they are not a universal provider billing guarantee. See the deployment guide/threat model.
+
+
 ## 0.4.1 — 2026-09-17
 
 - Replace lagging Fedora git-lfs/gh/yq and npm bundles with checksum-pinned upstream releases.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentbox"
-version = "0.4.1"
+version = "0.5.0a1"
 description = "Run AI coding agents in isolated containers"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -65,6 +65,8 @@ include = [
     "tests/**",
     "scripts/**",
     "docs/**",
+    "deploy/**",
+    "examples/**",
 ]
 
 [tool.pytest.ini_options]

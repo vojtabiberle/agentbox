@@ -863,3 +863,21 @@ gh attestation verify oci://ghcr.io/vojtabiberle/agentbox@sha256:DIGEST --repo v
 ```
 
 Attestation verifies the producing repository/workflow, not absence of vulnerabilities.
+
+### Always-on server preview
+
+`agentbox server run WORKSPACE` uses `/etc/agentbox/server.yaml`, which must be
+root-owned along with its ancestors and not writable by other users. It never loads
+workspace configuration/plugins/Dockerfiles. The policy fixes the image digest,
+command, workspace root and resource/time/output limits. Rootless Podman is required;
+Docker is deliberately unsupported in this profile.
+
+The server uses a read-only filesystem, temporary HOME and no IP network. An optional
+Unix-socket broker provides exact-host HTTPS access and a bounded Anthropic endpoint
+without handing provider keys to the workload. `server broker` and `server review-once`
+use separate root-owned policies. The reference controller can comment on assigned
+PRs using a GitHub App or a restricted DEV token held in Secret Manager.
+
+See [GCP deployment](deploy/gcp/README.md), the [example configuration](examples/scheduled-review/runner.example.tfvars.json)
+and [threat model](docs/THREAT_MODEL.md). This is a preview: local runtime and mocked
+boundary tests do not constitute a completed cloud or authenticated provider test.

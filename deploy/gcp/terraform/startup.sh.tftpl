@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+ssh-keygen -A
+systemctl restart ssh.service
+# Metadata holds only identifiers and policy, never secret material.
+systemctl stop agentbox-review.timer agentbox-review.service agentbox-broker.service
+install -d -m 755 /etc/agentbox
+printf '%s' '${server}' | base64 -d > /etc/agentbox/server.yaml
+printf '%s' '${broker}' | base64 -d > /etc/agentbox/broker.yaml
+printf '%s' '${review}' | base64 -d > /etc/agentbox/review.yaml
+chown root:root /etc/agentbox/*.yaml
+chmod 644 /etc/agentbox/*.yaml
+systemctl daemon-reload
+systemctl enable --now nftables.service
+if [ ! -e /etc/agentbox/STOP ]; then
+    systemctl enable --now agentbox-broker.service agentbox-review.timer
+    /usr/local/sbin/agentbox-ready
+fi

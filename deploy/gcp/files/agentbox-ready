@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+test ! -e /etc/agentbox/STOP
+systemctl is-active --quiet nftables.service
+systemctl is-active --quiet agentbox-broker.service
+systemctl is-active --quiet agentbox-review.timer
+test -S /run/agentbox-broker/proxy.sock
+test -S /run/agentbox-broker/control.sock
+runuser -u agentbox-runner -- env HOME=/var/lib/agentbox-runner XDG_RUNTIME_DIR=/run/user/1001 \
+    /opt/agentbox/bin/python - <<'PY'
+from pathlib import Path
+from agentbox.server import load_policy, execute
+policy=load_policy(Path('/etc/agentbox/server.yaml'))
+probe=policy.model_copy(update={'command':['sh','-c', 'test "$(id -u)" != 0 && test "$(ls /sys/class/net)" = lo && ! touch /etc/agentbox-denied && touch "$HOME/ready"'], 'broker_socket':None})
+result=execute(probe,policy.workspace_root)
+if result.returncode: raise SystemExit('Container isolation check failed')
+print('Agentbox runtime ready; provider/GitHub authorization still requires an end-to-end run')
+PY

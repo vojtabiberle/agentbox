@@ -18,6 +18,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,7 @@ def request_json(
 
 def reserve_budget(policy: BrokerPolicy) -> None:
     today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-    with sqlite3.connect(policy.ledger, timeout=5) as db:
+    with closing(sqlite3.connect(policy.ledger, timeout=5)) as db, db:
         db.execute(
             "CREATE TABLE IF NOT EXISTS budget (day TEXT PRIMARY KEY, cents INTEGER NOT NULL)"
         )
@@ -313,6 +314,16 @@ class Handler(BaseHTTPRequestHandler):
                         check(item)
 
             check(body)
+            # Claude Code adds identity/context hints; neither is needed by this text-only gateway.
+            body.pop("metadata", None)
+            body.pop("context_management", None)
+            output_config = body.get("output_config", {})
+            if (
+                not isinstance(output_config, dict)
+                or set(output_config) - {"effort"}
+                or output_config.get("effort", "medium") not in {"low", "medium", "high", "max"}
+            ):
+                raise PermissionError("Unsupported output configuration")
             if any(tool.get("type", "custom") != "custom" for tool in body.get("tools", [])):
                 raise PermissionError("Provider-hosted tools are disabled")
             headers = {
@@ -348,6 +359,7 @@ class Handler(BaseHTTPRequestHandler):
                 "top_k",
                 "stop_sequences",
                 "thinking",
+                "output_config",
             }
             if set(body) - allowed_keys:
                 raise PermissionError("Unsupported model request options")

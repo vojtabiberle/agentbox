@@ -8,6 +8,7 @@ import json
 import socket
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +70,7 @@ def review_once(config: ReviewPolicy) -> int:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return 0
-        with sqlite3.connect(config.ledger) as db:
+        with closing(sqlite3.connect(config.ledger)) as db, db:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS reviews (repo TEXT, pr INTEGER, sha TEXT, "
                 "status TEXT, PRIMARY KEY(repo,pr,sha))"

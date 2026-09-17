@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll for assigned PR reviews every two minutes
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=120
+RandomizedDelaySec=15
+Unit=agentbox-review.service
+
+[Install]
+WantedBy=timers.target

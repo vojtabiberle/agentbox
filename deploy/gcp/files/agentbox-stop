@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+# Persistent across reboot. Only administrators can clear this latch.
+install -m 600 /dev/null /etc/agentbox/STOP
+systemctl stop agentbox-review.timer agentbox-review.service agentbox-broker.service
+runuser -u agentbox-runner -- env HOME=/var/lib/agentbox-runner XDG_RUNTIME_DIR=/run/user/1001 \
+    podman rm -af --time 0 --filter label=io.agentbox.server=true

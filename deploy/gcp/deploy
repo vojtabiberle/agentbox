@@ -1,0 +1,27 @@
+#!/bin/bash
+set -euo pipefail
+# A shared image is baked once by maintainers; each user deploys it with one config.
+config=$(realpath "${1:?Usage: deploy/gcp/deploy path/to/runner.tfvars.json}")
+root=$(cd "$(dirname "$0")" && pwd)
+python3 - "$config" <<'PY'
+import json,sys
+c=json.load(open(sys.argv[1]))
+if not c.get('image'):
+    raise SystemExit('Select a maintainer-built GCP image first; see deploy/gcp/README.md')
+PY
+terraform -chdir="$root/terraform" init -input=false
+terraform -chdir="$root/terraform" apply -input=false -auto-approve -var-file="$config"
+readarray -t values < <(python3 - "$config" <<'PY'
+import json,sys
+c=json.load(open(sys.argv[1]));print(c.get('name','agentbox-runner'));print(c['project_id']);print(c['zone'])
+PY
+)
+for attempt in $(seq 1 60); do
+    if gcloud compute ssh "${values[0]}" --project "${values[1]}" --zone "${values[2]}" \
+        --tunnel-through-iap --quiet --command='sudo /usr/local/sbin/agentbox-ready'; then
+        exit 0
+    fi
+    sleep 10
+done
+printf 'Runner did not become ready; inspect startup and systemd logs through IAP.\n' >&2
+exit 1
