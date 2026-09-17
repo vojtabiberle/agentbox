@@ -2,11 +2,63 @@
 
 ![License](https://img.shields.io/badge/license-BSL_1.1-blue)
 
-Run AI coding agents in isolated containers with access only to your workspace.
+Run Claude Code, Hermes, Codex and Aider in containers with an explicit workspace,
+private agent state and optional mounts. An administrator-controlled server preview
+adds a networkless runner, credential broker and private GCP deployment.
 
 ## Why?
 
-Claude Code with `--dangerously-skip-permissions` is powerful but risky on your main system. agentbox sandboxes the agent in a container where it can only access the workspace you specify — everything else on your system is isolated.
+Claude Code with `--dangerously-skip-permissions` is powerful but risky on your main system.
+agentbox limits filesystem access to the workspace, private agent HOME and explicitly
+configured mounts. Local runs have network access by default; the server profile uses
+a separate, stricter policy. Containers share the host kernel; see the
+[threat model](docs/THREAT_MODEL.md) for server trust boundaries and exclusions.
+
+## Current capabilities and hackathon fit
+
+Status: 2026-09-17. This checkout is **0.5.0a1**, including the always-on server
+preview. Use the [source installation](#from-source) for that preview; do not assume
+the latest stable package or published workload image includes the server changes.
+See [release history](CHANGELOG.md) and [delivered work / remaining acceptance](ROADMAP.md).
+
+| Area | Available now | Guide |
+| --- | --- | --- |
+| Coding agents | Claude Code, Hermes, Codex, Aider; private persistent HOME per workspace/agent | [Agents](#agents-and-persistent-home), [Codex/Aider](#codex-and-aider) |
+| Development environments | Language/cloud toolsets, Kubernetes/Terraform, project Dockerfiles, worktrees, read-only context and MCP config mounts | [Toolsets](#toolsets), [project dependencies](#project-specific-dependencies), [MCP](#toolset-paths-and-mcp-configuration) |
+| Automation | Noninteractive stdin/exit status, named containers, explicit environment forwarding, managed Hermes gateway | [Batch runs](#batch-runs-and-container-names), [services](#hermes-gateway-service) |
+| Operations | State inspection/reset, doctor, dry-run access plan, CPU/memory/PID/network controls | [State](#private-state-management), [diagnostics](#diagnostics-and-preview), [limits](#resource-and-network-controls) |
+| Images | Published amd64 base/Python/PHP stacks, digest pinning, compatibility probes, SBOM, vulnerability gate and attestations | [Images](#prebuilt-images), [publication evidence](#image-compatibility-and-publication-evidence) |
+| Always-on preview | Administrator policy, rootless Podman, temporary HOME, broker-held secrets, bounded Anthropic requests, review controller, kill switch | [Server](#always-on-server-preview) |
+| GCP preview | Packer image and Terraform wrapper, private VM, IAP/OS Login, automatic OS updates, dedicated identities and systemd supervision | [Deployment and acceptance](deploy/gcp/README.md) |
+
+### Choose the execution profile
+
+| Boundary | Local `run` / Hermes `service` | `server` preview |
+| --- | --- | --- |
+| Configuration | Workspace/user config, toolsets and trusted project builds | Root-owned policy; ignores project config/plugins/Dockerfiles |
+| Runtime | Podman or Docker | Rootless Podman only; non-root workload UID |
+| State | Persistent private HOME; workspace writable | Temporary HOME; workspace read-only by default, writable only by administrator policy |
+| Network | Engine default, or explicitly `none` | No direct IP network; optional Unix broker |
+| Credentials | Explicit mounts, agent login or forwarded environment; HOME can contain secrets | Broker reads Secret Manager; provider/GitHub credentials stay outside workload |
+| Images | Local builds or selected prebuilt image | Preloaded digest-pinned image; no runtime pull/build |
+
+**Always-on runner hackathon:** the infrastructure and reference scheduled-review
+implementation are available. The GCP DEV pilot verified isolation, IAP, persistent
+stop across reboot and a live one-shot GitHub diff review through Anthropic. It did
+not publish a comment. Secret rotation, scheduled trigger/publication and measured
+onboarding within 15 minutes remain acceptance work. The deployment command requires
+an approved baked image, project/IAM and existing secrets; it creates billable resources.
+
+**Fabro / Connection factory hackathon:** reuse the GCP/security foundation and
+development images. There is **no Fabro integration or validated Connection builder**
+yet. The Docker toolset installs a CLI; agentbox does not expose a host Docker socket
+or provide a nested Docker/Compose environment. Connection build/Compose/`./bin/kbc`
+and E2E execution have not been validated here. Workflow orchestration, approval gates,
+multi-model review, Actions dispatch/result/cancel integration, exact-candidate evidence
+and independent hidden E2E tests must still be implemented. The current broker supports
+bounded Anthropic calls and restricted PR/comment routes, not a general multi-provider
+gateway or GitHub builder API. A future integration should keep Fabro's orchestration,
+builder execution and hidden verification in separate trust boundaries.
 
 ## Licensing
 
@@ -23,7 +75,9 @@ For commercial licensing inquiries, contact the repository owner.
 ## Prerequisites
 
 - [Podman](https://podman.io/) (recommended) or [Docker](https://www.docker.com/) for rootless containers
-- Claude Code credentials at `~/.claude/.credentials.json` (run `claude` once to authenticate)
+- Provider access for the selected agent; configure it inside its private HOME or
+  forward credentials explicitly. Host Claude credentials are not shared by default.
+- Server/GCP prerequisites differ; follow the [deployment guide](deploy/gcp/README.md).
 
 ## Installation
 
@@ -93,8 +147,19 @@ Options:
   --agent, -a NAME  Agent to run (default: claude)
   --ro, -r PATH     Read-only directory to mount (repeatable)
   --rebuild         Force rebuild the container image
+  --image REF       Select a prebuilt image
+  --dockerfile PATH Select a project Dockerfile inside the workspace
+  --no-git-mount    Disable automatic Git worktree mounting
+  --non-interactive Forward stdin without a TTY
+  --env NAME        Forward an existing host variable (repeatable)
+  --name NAME       Set a unique container name
+  --memory SIZE     Set container memory limit
+  --cpus NUMBER     Set CPU quota
+  --pids-limit N    Set process limit
+  --network MODE    Use default or none
+  --dry-run         Print a redacted access plan without starting a container
 
-agentbox build [--agent NAME] [--rebuild]   Build the container image
+agentbox build [--agent NAME] [--image REF] [--dockerfile PATH] [--rebuild]
 
 agentbox config              Show current configuration
 agentbox config show         Show current configuration (same as above)
@@ -103,9 +168,18 @@ agentbox config init --project   Create project config (.agentbox.yaml in curren
 agentbox config init --force     Overwrite existing config file
 
 agentbox toolset <name>      Show details about a specific toolset
+agentbox toolsets            List available toolsets
+agentbox doctor WORKSPACE [--agent NAME]   Check local runtime/configuration
+agentbox state show|list|reset            Inspect or reset private agent HOME
+agentbox service start|status|logs|stop    Manage Hermes gateway containers
+agentbox server run WORKSPACE             Run an administrator-approved workload
+agentbox server broker                   Serve the credential/egress broker
+agentbox server review-once              Poll assigned PRs for reference review
 
 agentbox upgrade             Upgrade agentbox (if installed via install.sh)
 ```
+
+Use `agentbox COMMAND --help` for command-specific arguments and defaults.
 
 ### Agents and persistent HOME
 
@@ -296,6 +370,8 @@ agentbox includes these built-in toolsets:
 | `base` | Git, Node.js, ripgrep, fd, bat, fzf, jq, yq, gh |
 | `claude` | Claude Code CLI (automatically selected for Claude) |
 | `hermes` | Hermes CLI, pinned source revision and locked Python dependencies |
+| `codex` | Codex CLI (automatically selected for Codex) |
+| `aider` | Aider CLI (automatically selected for Aider) |
 | `python` | Python 3 + pip |
 | `go` | Go programming language |
 | `rust` | Rust via rustup |
@@ -305,6 +381,9 @@ agentbox includes these built-in toolsets:
 | `cloud-gcloud` | Google Cloud CLI (mounts `~/.config/gcloud`) |
 | `docker` | Docker CLI |
 | `kubernetes` | Kubernetes CLI tools: kubectl, helm, kustomize |
+| `kubernetes-extras` | kubectx, kubens and stern; includes `kubernetes` |
+| `terraform` | Checksum-pinned Terraform CLI |
+| `ghostty` | Ghostty terminal information |
 
 Use `agentbox toolset <name>` to see details about a specific toolset, including mounts and dependencies.
 
@@ -442,10 +521,12 @@ environment:
 
 ## How it works
 
+For local `run` and `service` (the [server profile](#always-on-server-preview) differs):
+
 - **Workspace isolation**: The selected directory is mounted at `/workspace`; agentbox also mounts its private persistent HOME and explicitly configured mounts.
 - **Agent state**: Private HOME per workspace and agent. Host Claude configuration is shared only with `claude.share_host_config: true`.
-- **Rootless security**: Runs with `--userns=keep-id` and `--security-opt=no-new-privileges`
-- **No network restrictions**: Full network access for package installation and API calls
+- **User mapping**: Podman uses `--userns=keep-id`; Docker uses runtime-specific UID mapping. Both use `--security-opt=no-new-privileges`.
+- **Network**: Normal engine networking by default; `--network none` disables external access.
 
 ## Limitations
 
@@ -572,9 +653,7 @@ agentbox/
 └── install.sh          # curl installer script
 ```
 
-## Trademark
-
-AgentBox™ is a trademark of Vojta Biberle. Forks and derived works must use a different name and branding.
+## Runtime and operations guide
 
 ### Rootless Docker
 
@@ -872,12 +951,41 @@ workspace configuration/plugins/Dockerfiles. The policy fixes the image digest,
 command, workspace root and resource/time/output limits. Rootless Podman is required;
 Docker is deliberately unsupported in this profile.
 
-The server uses a read-only filesystem, temporary HOME and no IP network. An optional
+The server uses a read-only root filesystem, temporary HOME and no IP network. An optional
 Unix-socket broker provides exact-host HTTPS access and a bounded Anthropic endpoint
 without handing provider keys to the workload. `server broker` and `server review-once`
 use separate root-owned policies. The reference controller can comment on assigned
 PRs using a GitHub App or a restricted DEV token held in Secret Manager.
 
 See [GCP deployment](deploy/gcp/README.md), the [example configuration](examples/scheduled-review/runner.example.tfvars.json)
-and [threat model](docs/THREAT_MODEL.md). This is a preview: local runtime and mocked
-boundary tests do not constitute a completed cloud or authenticated provider test.
+and [threat model](docs/THREAT_MODEL.md).
+
+The GCP image adds host-level runner UID egress denial (including metadata), no public
+VM IP, IAP/OS Login, disabled password/root SSH, automatic OS updates and dedicated
+runner/broker identities. These host controls come from the GCP image; invoking
+`server run` alone does not configure them on an arbitrary host.
+
+The broker keeps provider credentials out of workload files/environment and admits
+requests against a durable daily reservation budget. This is **not billing
+reconciliation or a universal cost cap**: reservations must cover the configured
+model's worst-case request, and do not include VM/NAT/CI costs. Structured audit
+events cover lifecycle, broker decisions and controller actions, not every agent tool
+or syscall. See the deployment guide for limits, rotation and off-host log retention.
+
+The reference systemd timer polls directly assigned review requests. Its controller
+deduplicates repository/PR/head SHA, supplies only a bounded diff to Claude Code with
+tools disabled, and rechecks the head before commenting. It does not clone/build/test
+the repository, approve reviews, push branches or merge PRs. Failed or ambiguous runs
+require operator inspection before retry. `agentbox-stop` persistently disables the
+deployed services until an administrator explicitly clears the stop marker.
+
+**Verification:** the 2026-09-17 DEV pilot built/booted the GCP image, tested IAP,
+container and host network boundaries, stop across reboot, and a live one-shot PR
+review through Secret Manager/GitHub/Anthropic. No comment was published. The pilot's
+compute, disks, custom images and NAT resources were removed afterward; this is
+deployment tooling, not an available hosted service. Rotation, scheduled publication
+and the 15-minute onboarding target remain unverified end to end.
+
+## Trademark
+
+AgentBox™ is a trademark of Vojta Biberle. Forks and derived works must use a different name and branding.
