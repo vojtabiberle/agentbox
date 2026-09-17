@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add weekly/manual real-container CI on Podman and Docker.
+
 - Add doctor checks and a side-effect-free, redacted run preview.
 - Omit YAML source excerpts from configuration parse errors.
 

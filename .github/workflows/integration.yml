@@ -1,0 +1,73 @@
+name: Runtime Integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runtime:
+    name: Real ${{ matrix.runtime }} integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [podman, docker]
+    env:
+      AGENTBOX_TEST_RUNTIME: ${{ matrix.runtime }}
+      AGENTBOX_PROJECT_TEST_RUNTIME: ${{ matrix.runtime }}
+      AGENTBOX_TEST_IMAGE: localhost/agentbox-integration:ci
+      AGENTBOX_ADDITIONAL_AGENTS_IMAGE: localhost/agentbox-integration:ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: pip install -e '.[dev]'
+      - name: Prepare rootless Podman
+        if: matrix.runtime == 'podman'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs
+          if ! grep -q "^$(id -un):" /etc/subuid; then
+            sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$(id -un)"
+          fi
+          mkdir -p ~/.config/containers
+          printf '[engine]\ncgroup_manager="cgroupfs"\nevents_logger="file"\n' > ~/.config/containers/containers.conf
+      - name: Build current agent toolsets
+        run: |
+          mkdir -p /tmp/agentbox-integration-context
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from agentbox.config import Config
+          from agentbox.container import ContainerRuntime
+          from agentbox.image import ImageBuilder
+          builder = ImageBuilder(ContainerRuntime(os.environ['AGENTBOX_TEST_RUNTIME']), Config(toolsets=['claude','hermes','codex','aider']))
+          builder.plugin_manager.load(builder.config.toolsets)
+          Path('/tmp/agentbox-integration.Dockerfile').write_text(builder._render_dockerfile())
+          PY
+          "$AGENTBOX_TEST_RUNTIME" build -t "$AGENTBOX_TEST_IMAGE" -f /tmp/agentbox-integration.Dockerfile /tmp/agentbox-integration-context > build.log 2>&1
+      - name: Test real persistence, reset, mounts, batch, gateway and images
+        run: |
+          set -o pipefail
+          "$AGENTBOX_TEST_RUNTIME" run --rm --network=none "$AGENTBOX_TEST_IMAGE" claude --version
+          pytest -q tests/test_runtime_integration.py tests/test_project_image.py tests/test_prebuilt_images.py tests/test_additional_agents.py | tee integration.log
+      - name: Preserve failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.runtime }}-logs
+          path: |
+            build.log
+            integration.log
+          retention-days: 14

@@ -802,3 +802,12 @@ building/pulling images or starting containers. Environment values and agent arg
 values are omitted; only names and argument count are shown. The base image is shown;
 project extensions are resolved during execution. Required external mounts are still
 validated. A missing workspace must be created explicitly before previewing.
+
+### Scheduled integration coverage
+
+The `Runtime Integration` GitHub Actions workflow runs weekly and on manual dispatch.
+It builds the current Claude/Hermes/Codex/Aider toolsets, then checks real private HOME
+persistence, state reset refusal, read-only mounts, stdin/exit codes, gateway lifecycle
+and project image cache behavior on rootless Podman and standard Docker. Logs are
+retained for 14 days, including build failures. No model/provider credentials or paid
+model requests are used. Rootless Docker remains separately verified on a local daemon.
