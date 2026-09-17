@@ -8,7 +8,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from .config import Config
 from .exceptions import ConfigError
@@ -40,6 +40,10 @@ class RunSpec:
     name: str | None = None
     stdin: bool = False
     forwarded_env: tuple[str, ...] = ()
+    memory: str | None = None
+    cpus: float | None = None
+    pids_limit: int | None = None
+    network: Literal["default", "none"] = "default"
 
 
 def resolve_mounts(
@@ -180,6 +184,10 @@ def prepare_run(
         env["SSH_AUTH_SOCK"] = ssh_sock
     return RunSpec(
         image=image,
+        memory=config.limits.memory,
+        cpus=config.limits.cpus,
+        pids_limit=config.limits.pids_limit,
+        network=config.limits.network,
         home=home,
         name=name,
         stdin=stdin,

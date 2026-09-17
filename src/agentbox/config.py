@@ -34,10 +34,20 @@ class MCPMountConfig(MountConfig):
     required: bool = True
 
 
+class RuntimeLimits(BaseModel):
+    """Optional container resource controls; omitted limits use engine defaults."""
+
+    memory: str | None = Field(default=None, pattern=r"^[1-9][0-9]*[bBkKmMgG]?$", strict=True)
+    cpus: float | None = Field(default=None, gt=0, allow_inf_nan=False, strict=True)
+    pids_limit: int | None = Field(default=None, gt=0, strict=True)
+    network: Literal["default", "none"] = "default"
+
+
 class Config(BaseModel):
     """Main configuration model."""
 
     runtime: Literal["podman", "docker"] = "podman"
+    limits: RuntimeLimits = Field(default_factory=RuntimeLimits)
     toolsets: list[str] = Field(default_factory=lambda: ["base"])
     toolset_mounts: dict[str, dict[str, Path]] = Field(default_factory=dict)
     mcp_mounts: list[MCPMountConfig] = Field(default_factory=list)

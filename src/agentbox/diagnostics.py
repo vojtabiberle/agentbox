@@ -23,6 +23,7 @@ def describe_run(spec: RunSpec, config: Config, workspace: Path) -> None:
         json.dumps(
             {
                 "runtime": config.runtime,
+                "limits": config.limits.model_dump(),
                 "base_image": spec.image,
                 "project_dockerfile": str(extension) if (workspace / extension).is_file() else None,
                 "image_note": "Base image only; project extensions require a build.",

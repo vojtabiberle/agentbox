@@ -811,3 +811,24 @@ persistence, state reset refusal, read-only mounts, stdin/exit codes, gateway li
 and project image cache behavior on rootless Podman and standard Docker. Logs are
 retained for 14 days, including build failures. No model/provider credentials or paid
 model requests are used. Rootless Docker remains separately verified on a local daemon.
+
+### Resource and network controls
+
+```yaml
+limits:
+  memory: 2g
+  cpus: 1.5
+  pids_limit: 256
+  network: none
+```
+
+`run --memory 2g --cpus 1.5 --pids-limit 256 --network none` overrides the
+corresponding configuration fields. Services inherit these settings from their
+workspace configuration. Omitted limits keep engine defaults; `network: default`
+keeps normal engine networking. `none` disables external network access, including
+model APIs and package downloads; loopback remains available. Limits constrain the
+running container, not image builds. Memory accepts positive bytes or b/k/m/g units;
+CPU quotas must be positive and finite, PID limits positive integers.
+
+Actual enforcement requires runtime/cgroup support. Engine errors are surfaced;
+agentbox never silently drops requested limits. `--dry-run` includes resolved limits.

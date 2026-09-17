@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add validated memory/CPU/PID limits and optional offline networking for runs/services.
+
 - Add weekly/manual real-container CI on Podman and Docker.
 
 - Add doctor checks and a side-effect-free, redacted run preview.

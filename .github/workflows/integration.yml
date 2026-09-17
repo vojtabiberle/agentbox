@@ -62,6 +62,9 @@ jobs:
           set -o pipefail
           "$AGENTBOX_TEST_RUNTIME" run --rm --network=none "$AGENTBOX_TEST_IMAGE" claude --version
           pytest -q tests/test_runtime_integration.py tests/test_project_image.py tests/test_prebuilt_images.py tests/test_additional_agents.py | tee integration.log
+      - name: Verify enforced resource controls
+        if: matrix.runtime == 'docker'
+        run: pytest -q tests/test_resource_limits.py
       - name: Preserve failure evidence
         if: always()
         uses: actions/upload-artifact@v4

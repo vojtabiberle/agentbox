@@ -83,6 +83,15 @@ class ContainerRuntime:
     def build_command(self, spec: RunSpec) -> list[str]:
         """Render runtime arguments without starting a container."""
         cmd = [self.runtime, "run", "--rm", "--init"]
+        for option, value in (
+            ("--memory", spec.memory),
+            ("--cpus", spec.cpus),
+            ("--pids-limit", spec.pids_limit),
+        ):
+            if value is not None:
+                cmd.extend([option, str(value)])
+        if spec.network == "none":
+            cmd.append("--network=none")
         if spec.interactive:
             cmd.append("-it")
         elif spec.stdin:

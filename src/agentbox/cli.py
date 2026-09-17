@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import click
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
@@ -91,6 +92,10 @@ main.add_command(service)
 @click.option("--image", help="Use a prebuilt image instead of building toolsets")
 @click.option("--rebuild", is_flag=True, help="Force rebuild the container image")
 @click.option("--no-git-mount", is_flag=True, help="Disable automatic git worktree mounting")
+@click.option("--memory", help="Memory limit, e.g. 2g")
+@click.option("--cpus", type=float, help="Positive CPU quota, e.g. 1.5")
+@click.option("--pids-limit", type=int, help="Maximum process count")
+@click.option("--network", type=click.Choice(["default", "none"]))
 @click.option("--name", help="Container name (must be unique among existing containers)")
 @click.option(
     "--dockerfile", type=click.Path(path_type=Path), help="Project Dockerfile inside workspace"
@@ -113,6 +118,10 @@ def run(
     rebuild: bool,
     no_git_mount: bool,
     name: str | None,
+    memory: str | None,
+    cpus: float | None,
+    pids_limit: int | None,
+    network: str | None,
     dockerfile: Path | None,
     image: str | None,
     non_interactive: bool,
@@ -125,6 +134,25 @@ def run(
     """
     workspace_path = Path(workspace).expanduser().resolve()
     config, config_path = load_config(workspace_path)
+    overrides = {
+        key: value
+        for key, value in {
+            "memory": memory,
+            "cpus": cpus,
+            "pids_limit": pids_limit,
+            "network": network,
+        }.items()
+        if value is not None
+    }
+    if overrides:
+        try:
+            config = Config.model_validate(
+                {**config.model_dump(), "limits": {**config.limits.model_dump(), **overrides}}
+            )
+        except ValidationError as err:
+            raise click.BadParameter(
+                "Limits require positive finite CPUs/PIDs and memory such as 512m or 2g."
+            ) from err
     if image is not None:
         config = config.model_copy(update={"prebuilt_image": image})
     if dockerfile is not None:
