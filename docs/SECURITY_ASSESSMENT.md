@@ -50,6 +50,17 @@ Evidence sources: [Git LFS dependency manifest](https://github.com/git-lfs/git-l
 This is source dependency evidence for exact upstream tags, not a general guarantee
 about other releases or a function-level analysis of stripped binaries.
 
+## Scan results
+
+| Stack | v0.4.0 Critical / High / Medium / Low / Unknown | Patched image |
+| --- | --- | --- |
+| base | 8 / 29 / 22 / 2 / 2 | 0 / 3 / 0 / 0 / 2 |
+| Python | 8 / 29 / 24 / 2 / 2 | 0 / 3 / 0 / 0 / 2 |
+| PHP | 8 / 29 / 22 / 2 / 2 | 0 / 3 / 0 / 0 / 2 |
+
+The five residual matches are assessed above. Counts describe scanner findings,
+not independently reproduced exploits. New database revisions can change counts.
+
 ## Complete original finding inventory
 
 Grouped by artifact version and installed location. Every v0.4.0 finding is included;

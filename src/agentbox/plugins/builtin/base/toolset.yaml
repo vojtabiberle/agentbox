@@ -27,6 +27,7 @@ dockerfile: |
       printf '%s  %s\n' "$lfs_sha" lfs.tar.gz "$gh_sha" gh.tar.gz "$yq_sha" yq | sha256sum -c -; \
       tar -xzf lfs.tar.gz; tar -xzf gh.tar.gz; \
       install -m 755 git-lfs-3.8.0/git-lfs gh_2.101.0_linux_${arch}/bin/gh yq /usr/local/bin/; \
+      git lfs install --system; \
       cd /; rm -rf /tmp/agentbox-tools
 
   # Pre-populate SSH known_hosts for common Git hosts

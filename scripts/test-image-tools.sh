@@ -5,6 +5,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
 git init -q
+test "$(git config --get filter.lfs.required)" = true
 git lfs install --local
 printf 'agentbox LFS roundtrip\n' > original
 git lfs clean -- sample.bin < original > pointer
