@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 — 2026-09-17
+
+- Replace end-of-life Fedora 42 with supported Fedora 44 for new image builds.
+- Existing cached/prebuilt images require an explicit refresh or updated tag.
+
 ## 0.3.0 — 2026-09-17
 
 - Add prebuilt image selection/pull/refresh and GHCR stack publishing with registry smoke tests.

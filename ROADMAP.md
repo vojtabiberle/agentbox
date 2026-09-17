@@ -1,7 +1,7 @@
 # Roadmap
 
-Updated 2026-09-17. The accepted roadmap, including the former backlog, is
-implemented. [The delivery plan](docs/IMPLEMENTATION_PLAN.md) records the twelve
+Updated 2026-09-17. The original roadmap, including the former backlog, was implemented in v0.3.0.
+The operational hardening milestones below are now accepted. [The delivery plan](docs/IMPLEMENTATION_PLAN.md) records the twelve
 functional slices and their acceptance checks. Release details and migration notes
 are in [CHANGELOG.md](CHANGELOG.md); usage is in [README.md](README.md).
 
@@ -62,5 +62,13 @@ are in [CHANGELOG.md](CHANGELOG.md); usage is in [README.md](README.md).
   [the publishing run](https://github.com/vojtabiberle/agentbox/actions/runs/35159137041).
   Anonymous registry access was verified for all three stacks.
 
-No accepted implementation items remain open. New features require a new scope;
-external provider/bot configuration remains an operational prerequisite.
+## Accepted operational hardening
+
+- [ ] Supported Fedora base and patch release; rebuild/test published stacks.
+- [ ] `doctor` and side-effect-free `run --dry-run`, with redacted environment values.
+- [ ] Scheduled real Podman/Docker integration CI; no paid model calls.
+- [ ] Optional CPU/memory/PID limits and disabled networking.
+- [ ] Image inventory, vulnerability reports, build provenance and prebuilt tool checks.
+
+See the delivery plan for acceptance criteria. Provider/bot configuration remains
+an operational prerequisite.

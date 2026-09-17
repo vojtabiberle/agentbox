@@ -24,3 +24,17 @@ State reset must never remove another agent/workspace or follow a host symlink.
 Gateway operation uses an explicit service command, not an implicit background run.
 Bot credentials and external provider availability may require user setup; do not
 claim end-to-end provider validation when only offline lifecycle tests ran.
+
+## Operational hardening (accepted 2026-09-17)
+
+Each slice receives tests, a PR and a merge after green CI. No new paid model calls.
+
+| Slice | Plan | Acceptance | Status |
+| --- | --- | --- | --- |
+| 13. Supported base | Move to Fedora 44; patch release 0.3.1; rebuild public stacks. | Real base/agent startup and published stack tests; package CI. | In progress |
+| 14. Diagnostics | Doctor checks runtime/workspace/mounts/image; dry-run renders redacted resolved specification without builds, pulls or state creation. | No mutation and no secret values in output; actionable failures. | Pending |
+| 15. Integration CI | Scheduled/manual Podman and Docker builds with real persistence/reset/project/service tests. | Both runtime jobs pass without model credentials. | Pending |
+| 16. Resource controls | Validated memory/CPU/PID/network settings in config and CLI, shared by services. | Render tests and real runtime inspection/offline execution. | Pending |
+| 17. Image trust | Tool inventory and versions; vulnerability report; provenance attestation; check required executables before using prebuilt images. | Published reports/attestation, missing-tool rejection and successful compatible image run. | Pending |
+
+Finish with v0.4.0, updated verification evidence and published image artifacts.
