@@ -77,7 +77,7 @@ an operational prerequisite.
 
 - Fedora 44 builds/startup passed for Claude, Hermes, Codex and Aider; all three
   public stacks rebuilt successfully for v0.3.1.
-- 416 tests passed with all optional local container tests enabled (90% coverage).
+- 419 tests passed with all optional local container tests enabled (90% coverage).
 - Hosted Podman and Docker integration passed in
   [run 35192001117](https://github.com/vojtabiberle/agentbox/actions/runs/35192001117).
   Real memory/CPU/PID and offline networking checks also passed locally on both engines.

@@ -15,6 +15,11 @@
 - Add doctor checks and a side-effect-free, redacted run preview.
 - Omit YAML source excerpts from configuration parse errors.
 
+Validation: 419 tests passed with optional container integrations enabled (90%
+coverage), Python 3.10–3.13 CI, Ruff and strict mypy. Hosted Podman/Docker integration
+and clean distribution installation passed. No new model API calls were needed.
+Image vulnerability findings remain report-only and require individual assessment.
+
 ## 0.3.1 — 2026-09-17
 
 - Replace end-of-life Fedora 42 with supported Fedora 44 for new image builds.
