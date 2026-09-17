@@ -97,3 +97,15 @@ an operational prerequisite.
 
 See [the security assessment](docs/SECURITY_ASSESSMENT.md) for original advisories,
 remaining findings and update instructions. Raw findings remain visible.
+
+## Always-on runner (accepted 2026-09-17)
+
+- [x] Administrator-owned server policy: pinned image, confined workspace, no project configuration/plugins/builds, non-root Podman, read-only root and temporary HOME.
+- [x] Supervised batch execution: timeout, bounded output, structured lifecycle audit, persistent kill switch and cleanup.
+- [x] External network/credential boundary: networkless workload with an allowlisted Unix-socket broker, Secret Manager integration and model budget admission outside the agent.
+- [ ] GCP VM image recipe and Terraform deployment: private VM, IAP/OS Login, updates, dedicated identities, systemd supervision and readiness checks.
+- [x] Scheduled review reference: trusted polling, repository-scoped GitHub App access, SHA deduplication and adversarial acceptance tests.
+- [ ] Threat model and operating guide, with explicit local/cloud verification evidence.
+
+Cloud deployment, provider calls and the 15-minute onboarding target require a selected
+GCP project and configured GitHub/model credentials; they are not implied by unit tests.

@@ -11,6 +11,7 @@ from rich.table import Table
 from . import __version__
 from .agents import get_agent
 from .agents.base import Agent
+from .broker import broker_main  # noqa: F401
 from .config import (
     Config,
     get_config_paths,
@@ -27,6 +28,8 @@ from .execution import prepare_run
 from .git import GitWorktreeInfo, detect_worktree
 from .image import ImageBuilder
 from .plugins import PluginManager
+from .review import review_main  # noqa: F401
+from .server import server
 from .service_cli import service
 from .state_cli import state
 
@@ -47,7 +50,7 @@ def main(ctx: click.Context) -> None:
     ctx.ensure_object(dict)
 
     # Run must resolve its workspace before loading project configuration.
-    if ctx.invoked_subcommand in {"run", "state", "service", "doctor"}:
+    if ctx.invoked_subcommand in {"run", "state", "service", "doctor", "server"}:
         return
 
     # Commands that can run even with invalid config
@@ -75,6 +78,7 @@ def main(ctx: click.Context) -> None:
 main.add_command(doctor)
 main.add_command(state)
 main.add_command(service)
+main.add_command(server)
 
 
 @main.command()

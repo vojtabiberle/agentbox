@@ -54,3 +54,17 @@ Delivered in v0.4.1: all three local scans report 0 Critical / 3 High / 0 Medium
 source dependency evidence in [the assessment](SECURITY_ASSESSMENT.md).
 420 local tests passed (90% coverage); offline tool operations and Claude startup
 passed on all three rebuilt stacks. PR #46 contains the fixes and CI verification.
+
+## Always-on runner delivery
+
+1. **Server policy and batch runner**: add a separate `agentbox server` entry point that never loads workspace configuration. Root-owned policy fixes the image digest, workspace root, command, limits and optional broker socket. Only rootless Podman is supported. Drop capabilities, use a read-only root, temporary HOME/tmp, no host credentials or network. Timeout/termination removes the owned container; bounded output and lifecycle events omit secrets.
+2. **Broker boundary**: Unix socket is the only network capability. Exact-host HTTPS allowlist rejects private/link-local addresses and direct-IP targets; model calls pass through a separate budget/credential path. Secrets stay in broker memory. Kill file is checked by runner and broker. Test bypasses and fail-closed behavior.
+3. **Deployment**: bake a private GCP VM image; Terraform supplies IAM, private networking, IAP, Secret Manager access and configuration without secret payloads. Dedicated system users separate supervisor, workload and broker. Systemd boots services and timers; host security updates are automatic. Validate Terraform/Packer and units; only deploy to an explicitly selected project.
+4. **Reference workload**: trusted controller polls GitHub using an installation token, snapshots PR data without executing repository code, invokes Claude Code in the server profile, and publishes one review per head SHA. Keep the GitHub App signing key outside the workload. Test deduplication and adversarial inputs without posting externally.
+5. **Acceptance/release**: real local container negative tests (network, metadata, mounts, policy, root, timeout/kill), mocked broker/provider/controller tests, hosted runtime CI, threat model, reproducible deploy instructions. Each functional slice gets a tested PR/merge. Report cloud/provider verification separately; no new paid model calls without authorization.
+
+Local execution milestone: administrator policy, Unix broker and reference controller
+implemented together because their capability boundary is tested end-to-end. 32 boundary
+tests passed, including real Podman network/filesystem/UID checks, timeout/output cleanup
+and the actual container-to-Unix bridge. GitHub signing/provider calls use test doubles;
+no external comments or paid requests were sent. Deployment is a separate PR.
