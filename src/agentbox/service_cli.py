@@ -59,6 +59,8 @@ def start(
     runtime = ContainerRuntime(ctx.obj["service_runtime"] or config.runtime)
     builder = ImageBuilder(runtime, config, workspace=workspace, config_path=config_path)
     image = builder.ensure_image()
+    if config.prebuilt_image:
+        runtime.check_executables(image, agent.get_command()[:1])
     spec = prepare_run(
         image,
         workspace,

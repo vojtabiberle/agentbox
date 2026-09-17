@@ -64,8 +64,8 @@ def test_doctor_checks_agent_without_mounts_or_network(tmp_path, monkeypatch):
     monkeypatch.setattr('agentbox.diagnostics.subprocess.run', run)
     result = CliRunner().invoke(main, ['doctor', str(tmp_path)])
     assert result.exit_code == 0, result.output
-    cmd = run.call_args.args[0]
-    assert '--network=none' in cmd and '--read-only' in cmd and '-v' not in cmd
+    runtime.check_executables.assert_called_once()
+    assert runtime.check_executables.call_args.args[1] == ['claude']
     assert not (tmp_path / '.local').exists()
 
 

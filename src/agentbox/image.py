@@ -85,6 +85,8 @@ class ImageBuilder:
                 console.print("[green]Image built successfully.[/green]")
 
         if extension is None or dry_run:
+            if self.config.prebuilt_image and not dry_run:
+                self.runtime.check_executables(image_name, self.plugin_manager.get_executables())
             return image_name
 
         assert self.workspace is not None
@@ -101,6 +103,8 @@ class ImageBuilder:
         # Let the engine evaluate COPY/ADD inputs and .dockerignore on every run.
         # Checking only image existence would reuse stale project dependencies.
         self.runtime.build(project_dockerfile, project_image, context=self.workspace)
+        if self.config.prebuilt_image:
+            self.runtime.check_executables(project_image, self.plugin_manager.get_executables())
         return project_image
 
     def _compute_image_name(self, dockerfile: str) -> str:

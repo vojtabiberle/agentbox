@@ -184,6 +184,11 @@ def run(
         else builder.ensure_image(force_rebuild=rebuild)
     )
 
+    if config.prebuilt_image and not dry_run:
+        runtime.check_executables(
+            image_name, [agent_instance.get_command()[0]] if not bash else ["bash"]
+        )
+
     # Detect git worktree
     git_worktree: GitWorktreeInfo | None = None
     if not no_git_mount:

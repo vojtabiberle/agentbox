@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from agentbox.exceptions import (
@@ -194,6 +195,17 @@ class PluginManager:
                     comment += f" - {plugin.manifest.description}"
                 fragments.append(f"{comment}\n{plugin.manifest.dockerfile}")
         return fragments
+
+    def get_executables(self) -> list[str]:
+        """Command-like provides entries; descriptive resources are not executables."""
+        return sorted(
+            {
+                tool
+                for plugin in self._loaded
+                for tool in plugin.manifest.provides
+                if re.fullmatch(r"[A-Za-z0-9_.+-]+", tool)
+            }
+        )
 
     def get_all_mounts(
         self,

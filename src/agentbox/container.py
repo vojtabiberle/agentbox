@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Literal
@@ -46,6 +47,47 @@ class ContainerRuntime:
     def pull(self, image: str) -> None:
         """Pull an explicitly selected image using runtime registry authentication."""
         subprocess.run([self.runtime, "pull", image], check=True)
+
+    def check_executables(self, image: str, executables: list[str]) -> None:
+        """Probe image compatibility without host mounts, credentials or networking."""
+        if not executables:
+            return
+        if any(not re.fullmatch(r"[A-Za-z0-9_.+-]+", tool) for tool in executables):
+            raise ConfigError("Invalid executable name in image requirements")
+        try:
+            result = subprocess.run(
+                [
+                    self.runtime,
+                    "run",
+                    "--rm",
+                    "--network=none",
+                    "--read-only",
+                    "--cap-drop=ALL",
+                    "--security-opt=no-new-privileges",
+                    "--user",
+                    "65534:65534",
+                    "--entrypoint",
+                    "/bin/sh",
+                    image,
+                    "-c",
+                    'for tool; do command -v "$tool" >/dev/null || { '
+                    'printf "%s\\n" "$tool"; failed=1; }; done; exit "${failed:-0}"',
+                    "agentbox-check",
+                    *executables,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as err:
+            raise ConfigError(
+                "Cannot check image executables; verify runtime/image compatibility"
+            ) from err
+        if result.returncode:
+            missing = sorted(set(result.stdout.splitlines()) & set(executables))
+            detail = ", ".join(missing) if missing else "probe failed"
+            raise ConfigError(f"Image does not satisfy required executables: {detail}")
 
     def image_id(self, image: str) -> str:
         """Resolve a mutable image tag before composing a project extension."""

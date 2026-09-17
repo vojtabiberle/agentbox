@@ -832,3 +832,30 @@ CPU quotas must be positive and finite, PID limits positive integers.
 
 Actual enforcement requires runtime/cgroup support. Engine errors are surfaced;
 agentbox never silently drops requested limits. `--dry-run` includes resolved limits.
+
+### Image compatibility and publication evidence
+
+Prebuilt runs now check the selected agent and command-like `provides` inventory
+entries before creating private HOME or launching the agent. Missing commands fail
+with their names. Project extensions are built before this check, so they can install
+additional tools. Commands must be available on the image's default PATH; descriptive
+resources such as `xterm-ghostty terminfo` are excluded. Custom toolsets should declare
+their required executable names in `provides`. The probe has no host mounts,
+credentials or networking, runs unprivileged with a read-only root and a 30s timeout.
+It verifies availability, not tool behavior or image trust.
+
+Published stacks include RPM/npm version inventories, a CycloneDX SBOM and a Trivy
+vulnerability report in the workflow's `image-reports-STACK` artifacts (90-day retention).
+The summary reports vulnerability counts. Findings are reported, not automatically
+waived or treated as a clean bill of health; scan/tool failures block publication.
+Build provenance and SBOM attestations are signed with GitHub Actions identity and
+pushed to GHCR. Rolling/release tags are promoted only after smoke tests, scan and
+attestation succeed. Workflow actions and scanner versions are pinned.
+
+Verify a digest-pinned image with GitHub CLI:
+
+```bash
+gh attestation verify oci://ghcr.io/vojtabiberle/agentbox@sha256:DIGEST --repo vojtabiberle/agentbox
+```
+
+Attestation verifies the producing repository/workflow, not absence of vulnerabilities.

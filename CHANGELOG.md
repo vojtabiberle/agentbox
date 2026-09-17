@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Validate executable compatibility before launching prebuilt images.
+- Publish image inventories, vulnerability reports and signed provenance/SBOM attestations.
+
 - Add validated memory/CPU/PID limits and optional offline networking for runs/services.
 
 - Add weekly/manual real-container CI on Podman and Docker.

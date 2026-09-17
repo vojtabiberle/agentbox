@@ -103,35 +103,6 @@ def doctor(workspace: Path, agent: str) -> None:
         raise click.ClickException(
             "Base image is not cached; run agentbox build for this workspace/agent first."
         )
-    try:
-        result = subprocess.run(
-            [
-                runtime.runtime,
-                "run",
-                "--rm",
-                "--network=none",
-                "--read-only",
-                "--cap-drop=ALL",
-                "--user",
-                "65534:65534",
-                "--entrypoint",
-                "/bin/sh",
-                image,
-                "-c",
-                'command -v "$1" >/dev/null',
-                "agentbox-doctor",
-                selected.get_command()[0],
-            ],
-            capture_output=True,
-            timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError) as err:
-        raise click.ClickException(
-            "Image executable check failed; check runtime image compatibility."
-        ) from err
-    if result.returncode:
-        raise click.ClickException(
-            "Selected agent is unavailable in the base image; build or select a compatible image."
-        )
+    runtime.check_executables(image, selected.get_command()[:1])
     click.echo("OK: selected agent executable exists in cached base image")
     click.echo("Provider authentication and project extension readiness are not checked.")

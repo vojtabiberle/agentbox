@@ -66,7 +66,7 @@ are in [CHANGELOG.md](CHANGELOG.md); usage is in [README.md](README.md).
 
 - [x] Supported Fedora base and patch release; rebuild/test published stacks.
 - [x] `doctor` and side-effect-free `run --dry-run`, with redacted environment values.
-- [ ] Scheduled real Podman/Docker integration CI; no paid model calls.
+- [x] Scheduled real Podman/Docker integration CI; no paid model calls.
 - [x] Optional CPU/memory/PID limits and disabled networking.
 - [ ] Image inventory, vulnerability reports, build provenance and prebuilt tool checks.
 
