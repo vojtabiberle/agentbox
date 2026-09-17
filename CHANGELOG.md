@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-09-17
 
+- Remove timed-out probe containers and report cleanup failures explicitly.
 - Validate executable compatibility before launching prebuilt images.
 - Publish image inventories, vulnerability reports and signed provenance/SBOM attestations.
+- Use checksum-pinned Syft/Grype with Fedora coverage and require complete RPM inventories.
 
 - Add validated memory/CPU/PID limits and optional offline networking for runs/services.
 

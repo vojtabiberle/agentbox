@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Literal
 
@@ -54,12 +55,15 @@ class ContainerRuntime:
             return
         if any(not re.fullmatch(r"[A-Za-z0-9_.+-]+", tool) for tool in executables):
             raise ConfigError("Invalid executable name in image requirements")
+        name = f"agentbox-probe-{uuid.uuid4().hex}"
         try:
             result = subprocess.run(
                 [
                     self.runtime,
                     "run",
                     "--rm",
+                    "--name",
+                    name,
                     "--network=none",
                     "--read-only",
                     "--cap-drop=ALL",
@@ -80,6 +84,16 @@ class ContainerRuntime:
                 text=True,
                 timeout=30,
             )
+        except subprocess.TimeoutExpired as err:
+            try:
+                subprocess.run(
+                    [self.runtime, "rm", "-f", name], capture_output=True, check=True, timeout=10
+                )
+            except (OSError, subprocess.SubprocessError) as cleanup_error:
+                raise ConfigError(
+                    f"Image probe timed out; remove container {name} manually"
+                ) from cleanup_error
+            raise ConfigError("Image executable probe timed out; container removed") from err
         except (OSError, subprocess.SubprocessError) as err:
             raise ConfigError(
                 "Cannot check image executables; verify runtime/image compatibility"

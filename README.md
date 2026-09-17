@@ -844,9 +844,11 @@ their required executable names in `provides`. The probe has no host mounts,
 credentials or networking, runs unprivileged with a read-only root and a 30s timeout.
 It verifies availability, not tool behavior or image trust.
 
-Published stacks include RPM/npm version inventories, a CycloneDX SBOM and a Trivy
+Published stacks include RPM/npm version inventories, a CycloneDX SBOM and a Grype
 vulnerability report in the workflow's `image-reports-STACK` artifacts (90-day retention).
-The summary reports vulnerability counts. Findings are reported, not automatically
+Syft catalogs packages; Grype uses Fedora security data. Publication checks that
+every installed RPM name/version appears in the SBOM and that scan metadata identifies
+Fedora. The summary reports vulnerability counts. Findings are reported, not automatically
 waived or treated as a clean bill of health; scan/tool failures block publication.
 Build provenance and SBOM attestations are signed with GitHub Actions identity and
 pushed to GHCR. Rolling/release tags are promoted only after smoke tests, scan and

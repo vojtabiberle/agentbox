@@ -73,3 +73,22 @@ def test_incompatible_prebuilt_fails_before_state_creation(tmp_path, monkeypatch
     assert result.exit_code==1
     assert not (tmp_path / 'host').exists()
     engine.run.assert_not_called()
+
+
+def test_timed_out_probe_is_removed(monkeypatch):
+    engine=runtime(monkeypatch)
+    run=MagicMock(side_effect=[subprocess.TimeoutExpired('probe',30),subprocess.CompletedProcess([],0,'')])
+    monkeypatch.setattr('agentbox.container.subprocess.run',run)
+    with pytest.raises(ConfigError,match='container removed'):
+        engine.check_executables('image',['claude'])
+    first=run.call_args_list[0].args[0]
+    name=first[first.index('--name')+1]
+    assert run.call_args_list[1].args[0]==['podman','rm','-f',name]
+
+
+def test_failed_probe_cleanup_is_reported_with_owned_container_name(monkeypatch):
+    engine=runtime(monkeypatch)
+    run=MagicMock(side_effect=[subprocess.TimeoutExpired('probe',30),subprocess.CalledProcessError(1,'rm')])
+    monkeypatch.setattr('agentbox.container.subprocess.run',run)
+    with pytest.raises(ConfigError,match='remove container agentbox-probe-.* manually'):
+        engine.check_executables('image',['claude'])

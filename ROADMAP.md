@@ -1,7 +1,7 @@
 # Roadmap
 
 Updated 2026-09-17. The original roadmap, including the former backlog, was implemented in v0.3.0.
-The operational hardening milestones below are now accepted. [The delivery plan](docs/IMPLEMENTATION_PLAN.md) records the twelve
+Operational hardening is delivered in v0.3.1 and v0.4.0. [The delivery plan](docs/IMPLEMENTATION_PLAN.md) records the twelve
 functional slices and their acceptance checks. Release details and migration notes
 are in [CHANGELOG.md](CHANGELOG.md); usage is in [README.md](README.md).
 
@@ -62,13 +62,28 @@ are in [CHANGELOG.md](CHANGELOG.md); usage is in [README.md](README.md).
   [the publishing run](https://github.com/vojtabiberle/agentbox/actions/runs/35159137041).
   Anonymous registry access was verified for all three stacks.
 
-## Accepted operational hardening
+## Operational hardening: v0.3.1 / v0.4.0
 
 - [x] Supported Fedora base and patch release; rebuild/test published stacks.
 - [x] `doctor` and side-effect-free `run --dry-run`, with redacted environment values.
 - [x] Scheduled real Podman/Docker integration CI; no paid model calls.
 - [x] Optional CPU/memory/PID limits and disabled networking.
-- [ ] Image inventory, vulnerability reports, build provenance and prebuilt tool checks.
+- [x] Image inventory, vulnerability reports, build provenance and prebuilt tool checks.
 
 See the delivery plan for acceptance criteria. Provider/bot configuration remains
 an operational prerequisite.
+
+### Hardening verification
+
+- Fedora 44 builds/startup passed for Claude, Hermes, Codex and Aider; all three
+  public stacks rebuilt successfully for v0.3.1.
+- 416 tests passed with all optional local container tests enabled (90% coverage).
+- Hosted Podman and Docker integration passed in
+  [run 35192001117](https://github.com/vojtabiberle/agentbox/actions/runs/35192001117).
+  Real memory/CPU/PID and offline networking checks also passed locally on both engines.
+- Prebuilt executable probes reject missing commands without exposing arbitrary image
+  output. Timed-out probes are removed; failed cleanup identifies the owned container.
+- Image publication verifies every installed RPM name/version in both Syft and
+  CycloneDX inventories. Grype scans Fedora data; findings remain report-only.
+  Published provenance and SBOM attestations are verified against image digests.
+- No additional paid model calls were made for these milestones.

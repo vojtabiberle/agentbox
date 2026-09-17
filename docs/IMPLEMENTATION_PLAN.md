@@ -32,9 +32,10 @@ Each slice receives tests, a PR and a merge after green CI. No new paid model ca
 | Slice | Plan | Acceptance | Status |
 | --- | --- | --- | --- |
 | 13. Supported base | Move to Fedora 44; patch release 0.3.1; rebuild public stacks. | Real base/agent startup and published stack tests; package CI. | Done: PR #40, v0.3.1; four agents built/started, 10 real checks |
-| 14. Diagnostics | Doctor checks runtime/workspace/mounts/image; dry-run renders redacted resolved specification without builds, pulls or state creation. | No mutation and no secret values in output; actionable failures. | Done: redacted preview and doctor; real Podman checks passed |
+| 14. Diagnostics | Doctor checks runtime/workspace/mounts/image; dry-run renders redacted resolved specification without builds, pulls or state creation. | No mutation and no secret values in output; actionable failures. | Done: PR #41; redacted preview and doctor; real Podman checks passed |
 | 15. Integration CI | Scheduled/manual Podman and Docker builds with real persistence/reset/project/service tests. | Both runtime jobs pass without model credentials. | Done: PR #42; hosted Podman/Docker run 35191240839 passed |
-| 16. Resource controls | Validated memory/CPU/PID/network settings in config and CLI, shared by services. | Render tests and real runtime inspection/offline execution. | Done: CPU/memory/PID cgroups and offline network verified on Podman/Docker |
-| 17. Image trust | Tool inventory and versions; vulnerability report; provenance attestation; check required executables before using prebuilt images. | Published reports/attestation, missing-tool rejection and successful compatible image run. | Implemented; publication/attestation verification pending |
+| 16. Resource controls | Validated memory/CPU/PID/network settings in config and CLI, shared by services. | Render tests and real runtime inspection/offline execution. | Done: PR #43; CPU/memory/PID cgroups and offline network verified on Podman/Docker |
+| 17. Image trust | Tool inventory and versions; vulnerability report; provenance attestation; check required executables before using prebuilt images. | Published reports/attestation, missing-tool rejection and successful compatible image run. | PR #44 plus release corrections: Syft/Grype RPM completeness gate; publication validation in final release |
 
-Finish with v0.4.0, updated verification evidence and published image artifacts.
+Final release: v0.4.0, 416 passing tests (90% coverage), hosted Podman/Docker verification,
+clean package installation and published image reports/attestations.

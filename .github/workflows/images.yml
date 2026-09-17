@@ -64,24 +64,15 @@ jobs:
           docker run --rm --network=none agentbox-check rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' | sort > reports/rpm-packages.txt
           docker run --rm --network=none agentbox-check npm list -g --depth=0 --json > reports/npm-packages.json
           docker run --rm --network=none agentbox-check claude --version > reports/agent-version.txt
-      - name: Install pinned scanner
-        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
-        with:
-          version: v0.74.0
-          cache: true
-      - name: Scan vulnerabilities and generate SBOM
+      - name: Install checksum-pinned scanners
         run: |
-          trivy image --image-src docker --scanners vuln --list-all-pkgs --format json --output reports/vulnerabilities.json --timeout 10m agentbox-check
-          trivy convert --format cyclonedx --output reports/sbom.cdx.json reports/vulnerabilities.json
-          python - <<'PY'
-          import json, os
-          from collections import Counter
-          from pathlib import Path
-          data=json.loads(Path('reports/vulnerabilities.json').read_text())
-          counts=Counter(v['Severity'] for result in data.get('Results', []) for v in result.get('Vulnerabilities', []))
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
-              stream.write('Vulnerability findings (report-only policy): '+str(dict(counts))+'\n')
-          PY
+          sh scripts/install-image-scanners.sh "$RUNNER_TEMP/image-scanners"
+          echo "$RUNNER_TEMP/image-scanners" >> "$GITHUB_PATH"
+      - name: Catalog packages and scan Fedora vulnerabilities
+        run: |
+          syft docker:agentbox-check -o syft-json=reports/sbom.syft.json -o cyclonedx-json=reports/sbom.cdx.json
+          grype sbom:reports/sbom.syft.json -o json --file reports/vulnerabilities.json
+          python scripts/verify-image-reports.py reports >> "$GITHUB_STEP_SUMMARY"
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
