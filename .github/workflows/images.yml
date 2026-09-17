@@ -54,6 +54,7 @@ jobs:
           docker build --pull --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --label "org.opencontainers.image.revision=$GITHUB_SHA" -t agentbox-check -f /tmp/agentbox.Dockerfile /tmp/agentbox-image-context
           docker run --rm agentbox-check claude --version
           docker run --rm agentbox-check git --version
+          docker run --rm -i --network=none agentbox-check sh -s < scripts/test-image-tools.sh
           case "$STACK" in
             python) docker run --rm agentbox-check python3 --version ;;
             php) docker run --rm agentbox-check php --version; docker run --rm agentbox-check composer --version ;;
@@ -115,6 +116,7 @@ jobs:
           push-to-registry: true
           create-storage-record: false
       - name: Promote verified candidate
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         env:
           PUBLISHED_TAG: ${{ steps.candidate.outputs.tag }}
         run: |

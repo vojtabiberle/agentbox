@@ -87,3 +87,13 @@ an operational prerequisite.
   CycloneDX inventories. Grype scans Fedora data; findings remain report-only.
   Published provenance and SBOM attestations are verified against image digests.
 - No additional paid model calls were made for these milestones.
+
+## Dependency remediation: v0.4.1
+
+- [x] Assess every finding in the v0.4.0 image reports, including exact package paths.
+- [x] Pin patched upstream git-lfs, gh, yq, npm and pip; verify installer checksums.
+- [x] Document version-specific reachability evidence for residual Go module matches.
+- [x] Add offline functional package-manager tests and block Critical findings before publication.
+
+See [the security assessment](docs/SECURITY_ASSESSMENT.md) for original advisories,
+remaining findings and update instructions. Raw findings remain visible.

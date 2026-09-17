@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — 2026-09-17
+
+- Replace lagging Fedora git-lfs/gh/yq and npm bundles with checksum-pinned upstream releases.
+- Bootstrap patched pip for the Python toolset.
+- Block publication of images with Critical findings; retain all raw findings.
+- Exercise Git LFS roundtrips, YAML parsing and offline npm/pip installs before publishing.
+
+
 ## 0.4.0 — 2026-09-17
 
 - Remove timed-out probe containers and report cleanup failures explicitly.

@@ -32,7 +32,9 @@ def verify(root: Path) -> str:
             or "fedora" not in database.get("providers", {})):
         raise ValueError("Vulnerability report does not identify Fedora; refusing publication")
     counts = Counter(match["vulnerability"]["severity"] for match in scan["matches"])
-    return f"Verified {len(installed)} RPM packages in both inventories. Findings (report-only): {dict(counts)}"
+    if counts["Critical"]:
+        raise ValueError("Critical image vulnerabilities found; refusing publication")
+    return f"Verified {len(installed)} RPM packages in both inventories. Findings (non-critical report-only): {dict(counts)}"
 
 
 if __name__ == "__main__":

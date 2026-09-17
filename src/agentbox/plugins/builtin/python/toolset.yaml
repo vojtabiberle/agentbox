@@ -8,5 +8,11 @@ priority: 50
 dockerfile: |
   # Python development
   RUN dnf install -y \
-      python3 python3-pip python3-devel \
+      --setopt=install_weak_deps=False python3 python3-devel \
       && dnf clean all
+
+  # Bootstrap a patched pip wheel without leaving the older RPM copy on sys.path.
+  RUN curl -fsSL https://files.pythonhosted.org/packages/f3/6e/1736e5b4ae2b778ef2f81c47d797de9f891d4d8acb047a24ca37a60294dd/pip-26.2.1-py3-none-any.whl -o /tmp/pip-26.2.1-py3-none-any.whl \
+      && echo '71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e  /tmp/pip-26.2.1-py3-none-any.whl' | sha256sum -c - \
+      && PYTHONPATH=/tmp/pip-26.2.1-py3-none-any.whl python3 -m pip install --no-index --no-deps /tmp/pip-26.2.1-py3-none-any.whl \
+      && rm /tmp/pip-26.2.1-py3-none-any.whl

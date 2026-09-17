@@ -6,14 +6,28 @@ priority: 10
 dockerfile: |
   # Base development tools
   RUN dnf install -y \
-      git git-lfs \
+      git \
       tmux htop vim \
       ripgrep fd-find bat fzf \
-      jq yq \
+      jq \
       openssh-clients \
       keychain \
-      gh \
+      curl tar gzip \
       && dnf clean all
+
+  # Upstream tools carry patched Go dependencies ahead of Fedora rebuilds.
+  RUN set -eu; case "$(uname -m)" in \
+      x86_64) arch=amd64; lfs_sha=e455e00f15d9b95661b8d53498ffb0c3367962cf1ec73c31ab7369516cd6ab8d; gh_sha=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8; yq_sha=c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385 ;; \
+      aarch64) arch=arm64; lfs_sha=ac9c8efac980bb0505ead384d087e2acb6486fd8498691a2165fa174ec6118c2; gh_sha=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f; yq_sha=88a1016bc1d657375a35864e4f44b6f333df8ff97b559f51bba0adcb2169df09 ;; \
+      *) echo "Unsupported architecture" >&2; exit 1 ;; esac; \
+      mkdir /tmp/agentbox-tools; cd /tmp/agentbox-tools; \
+      curl -fsSL "https://github.com/git-lfs/git-lfs/releases/download/v3.8.0/git-lfs-linux-${arch}-v3.8.0.tar.gz" -o lfs.tar.gz; \
+      curl -fsSL "https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_${arch}.tar.gz" -o gh.tar.gz; \
+      curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_${arch}" -o yq; \
+      printf '%s  %s\n' "$lfs_sha" lfs.tar.gz "$gh_sha" gh.tar.gz "$yq_sha" yq | sha256sum -c -; \
+      tar -xzf lfs.tar.gz; tar -xzf gh.tar.gz; \
+      install -m 755 git-lfs-3.8.0/git-lfs gh_2.101.0_linux_${arch}/bin/gh yq /usr/local/bin/; \
+      cd /; rm -rf /tmp/agentbox-tools
 
   # Pre-populate SSH known_hosts for common Git hosts
   # This prevents "authenticity of host" prompts during git operations
@@ -25,4 +39,13 @@ dockerfile: |
       && chown -R user:user /home/user/.ssh
 
   # Node.js (required for Claude Code)
-  RUN dnf install -y nodejs npm && dnf clean all
+  RUN dnf install -y --setopt=install_weak_deps=False nodejs && dnf clean all
+  # Bootstrap the complete patched npm bundle without keeping Fedora's older npm.
+  RUN curl -fsSL https://registry.npmjs.org/npm/-/npm-11.19.1.tgz -o /tmp/npm.tgz \
+      && echo '9f58bff01604cb1b14008fef14dceb14d836a49225e45c6c2e37de3be3e707f0  /tmp/npm.tgz' | sha256sum -c - \
+      && mkdir -p /usr/local/lib/node_modules/npm \
+      && tar -xzf /tmp/npm.tgz -C /usr/local/lib/node_modules/npm --strip-components=1 \
+      && ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+      && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+      && rm /tmp/npm.tgz \
+      && npm --version

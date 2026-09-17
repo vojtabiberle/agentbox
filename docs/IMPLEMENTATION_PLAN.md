@@ -39,3 +39,12 @@ Each slice receives tests, a PR and a merge after green CI. No new paid model ca
 
 Final release: v0.4.0, 419 passing tests (90% coverage), hosted Podman/Docker verification,
 clean package installation and published image reports/attestations.
+
+## Dependency remediation (accepted 2026-09-17)
+
+1. Assess all v0.4.0 base/Python/PHP findings against advisory conditions and exact artifact paths.
+2. Replace lagging distribution Go binaries and package-manager bundles with checksum-pinned upstream releases; preserve tool availability.
+3. Build and scan all three stacks; exercise Git LFS, gh, yq, npm and pip. Record remaining matches with evidence, without suppressing raw reports.
+4. Run Python CI and real runtime checks; commit, PR and merge after verification, then publish patched images/release.
+
+Acceptance: no Critical findings in the three rebuilt images; any remaining findings explicitly assessed with version-scoped evidence. No paid model calls.

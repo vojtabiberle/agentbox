@@ -53,3 +53,13 @@ def test_incorrect_os_coverage_is_rejected(tmp_path, mutation):
     path.write_text(json.dumps(data))
     with pytest.raises(ValueError,match='does not identify Fedora'):
         verify(tmp_path)
+
+
+def test_critical_vulnerability_blocks_publication(tmp_path):
+    reports(tmp_path)
+    path = tmp_path / "vulnerabilities.json"
+    data = json.loads(path.read_text())
+    data["matches"][0]["vulnerability"]["severity"] = "Critical"
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="Critical image vulnerabilities"):
+        verify(tmp_path)
