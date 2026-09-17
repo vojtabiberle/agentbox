@@ -44,7 +44,12 @@ def broker(policy):
 
 def request(path, method, target, body=None):
     with closing(UnixClient(path)) as conn:
-        conn.request(method,target,body=json.dumps(body) if body is not None else None)
+        try:
+            conn.request(method,target,body=json.dumps(body) if body is not None else None)
+        except BrokenPipeError:
+            # A kill-switch rejection can arrive before the client writes its body.
+            # Still require a complete HTTP response and assert its status below.
+            pass
         response=conn.getresponse()
         return response.status,response.read()
 
