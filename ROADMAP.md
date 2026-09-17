@@ -109,4 +109,5 @@ remaining findings and update instructions. Raw findings remain visible.
 
 - [x] DEV infrastructure acceptance (2026-09-17): actual image build/deploy, IAP, non-root networkless container, read-only root, temporary HOME, runner UID denial of metadata/internet, persistent kill switch across reboot, disabled password/root SSH and enabled upgrade timers.
 - [x] Live provider probe: Claude Code → Unix broker → Anthropic Haiku, with Secret Manager credentials outside the workload.
-- [ ] Complete DEV acceptance: repository-authorized GitHub token, live review, secret rotation and measured one-command onboarding within 15 minutes. Current DEV token returns HTTP 404 for the selected repository PR.
+- [x] Live one-shot review: repository-authorized DEV token, real PR diff through the GitHub controller socket, Anthropic response and unchanged head SHA verified. No GitHub comment published.
+- [ ] Complete DEV acceptance: secret rotation, scheduled trigger/publication and measured one-command onboarding within 15 minutes. One-shot pilot used staged startup and withheld publication.

@@ -442,4 +442,9 @@ def broker_main(policy: Path) -> None:
             os.chmod(endpoint, 0o660)
         threading.Thread(target=controller.serve_forever, daemon=True).start()
         audit("broker_started")
+        if address := os.environ.get("NOTIFY_SOCKET"):
+            if address.startswith("@"):
+                address = "\0" + address[1:]
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notification:
+                notification.sendto(b"READY=1", address)
         broker.serve_forever()

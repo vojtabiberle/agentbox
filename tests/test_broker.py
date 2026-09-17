@@ -133,3 +133,36 @@ def test_github_app_mints_scoped_short_lived_token_without_key_file(policy):
     payload=json.loads(base64.urlsafe_b64decode(jwt.split('.')[1]+'=='))
     assert payload['iss']=='123' and payload['exp']-payload['iat']==330
     assert private not in jwt
+
+
+@pytest.mark.parametrize('abstract', [False, True])
+def test_systemd_ready_means_both_sockets_serve_requests(policy, tmp_path, abstract):
+    import os
+    import stat
+    import subprocess
+    import sys
+    import uuid
+
+    address = '@agentbox-test-' + uuid.uuid4().hex if abstract else str(tmp_path / 'notify')
+    bound_address = '\0' + address[1:] if abstract else address
+    code = (
+        'import sys; from pathlib import Path; import agentbox.broker as b; '
+        'b.trusted_file=lambda path: sys.argv[1]; '
+        'b.broker_main.callback(Path("/unused"))'
+    )
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as ready:
+        ready.bind(bound_address)
+        ready.settimeout(10)
+        process = subprocess.Popen(
+            [sys.executable, '-c', code, policy.model_dump_json()],
+            env={**os.environ, 'NOTIFY_SOCKET': address, 'PYTHONPATH': os.pathsep.join(sys.path)},
+            stdout=subprocess.DEVNULL,
+        )
+        try:
+            assert ready.recv(128) == b'READY=1'
+            for endpoint in (policy.socket, policy.control_socket):
+                assert stat.S_IMODE(endpoint.stat().st_mode) == 0o660
+                assert request(endpoint, 'GET', '/github/repos/other/repo/pulls')[0] == 403
+        finally:
+            process.terminate()
+            process.communicate(timeout=10)

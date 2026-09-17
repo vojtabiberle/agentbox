@@ -86,6 +86,11 @@ change to an accessible directory first. The corrected image built in 6m29s and 
 as a new private VM. IAP, host UID network denial (including metadata), container
 isolation, SSH settings, upgrade timers and persistent stop across reboot passed.
 A live synthetic Claude Haiku request through the broker completed in 5.3s. No
-external GitHub comments were created. GitHub review acceptance currently stops at
-HTTP 404 with the DEV token; repository access, rotation and timed one-command
-onboarding remain open. Pilot VMs used two-hour maximum runtimes and staged startup.
+external GitHub comments were created. After repository access was granted to the DEV
+token, a live one-shot review processed a 12,667-byte PR diff in 45.8s and verified the
+head SHA was unchanged. Broker audit recorded successful GitHub/model responses and
+one 25-cent reservation (not actual billed cost). A startup race found by the pilot is
+fixed using systemd READY notification after both sockets are initialized, verified
+on the live VM and by filesystem/abstract notification socket tests. Rotation,
+scheduled trigger/publication and timed one-command onboarding remain open.
+Pilot VMs used two-hour maximum runtimes and staged startup.

@@ -9,9 +9,11 @@
 - Add adversarial boundary tests and an actual offline Claude Code/SSE compatibility test.
 
 - Fix inherited working directories for rootless provisioning and host control scripts.
+- Wait for broker socket readiness using systemd notification before dependent services start.
 
-DEV image build/deployment, isolation, reboot/stop and a live model probe passed.
-GitHub review and timed onboarding acceptance remain pending. Cost reservations require administrator-reviewed pricing;
+DEV image build/deployment, isolation, reboot/stop, live model probe and one-shot GitHub
+review passed. Scheduled publication, rotation and timed onboarding remain pending.
+Cost reservations require administrator-reviewed pricing;
 they are not a universal provider billing guarantee. See the deployment guide/threat model.
 
 

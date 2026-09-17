@@ -2,10 +2,12 @@
 
 Implementation and local security tests are available. A DEV pilot on 2026-09-17
 built and booted the image, verified IAP, container/host isolation, persistent stop
-across reboot and a live Claude Haiku request through the broker. GitHub review
-acceptance remains pending repository access for the DEV token (HTTP 404).
+across reboot and a live Claude Haiku request through the broker. After granting the
+DEV token repository access, a one-shot review fetched a real PR diff through the
+GitHub controller socket and completed through Anthropic; no comment was published.
 The 15-minute onboarding target remains an acceptance criterion, not a measured result;
 the pilot used staged deployment with automatic workloads stopped.
+The broker uses systemd readiness notification so startup waits for both Unix sockets.
 
 The image is built once by maintainers. An end user selects the approved image and
 supplies identifiers in a small JSON config, then runs:
