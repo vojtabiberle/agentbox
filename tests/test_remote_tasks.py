@@ -249,13 +249,86 @@ def test_logs_capture_pane() -> None:
     assert f"tmux capture-pane -p -t ={SESSION}a: -S -50" in runner.remote_commands()
 
 
+class ContainerRunner(FakeRunner):
+    """Container listed by `ps -a` until `rm -f` succeeds (or forever if sticky)."""
+
+    present: bool = True
+    sticky: bool = False
+
+    def __call__(
+        self, argv: Sequence[str], *, input: str | None = None, tty: bool = False
+    ) -> CommandResult:
+        result = super().__call__(argv, input=input, tty=tty)
+        cmd = self.calls[-1].remote
+        if cmd.startswith("docker ps -a"):
+            return out(f"{CONTAINER}a-old\n{CONTAINER}a\n" if self.present else "")
+        if cmd.startswith("docker rm -f") and result.returncode == 0 and not self.sticky:
+            self.present = False
+        return result
+
+
+def _container_runner(**responses: CommandResult) -> ContainerRunner:
+    return ContainerRunner({"display-message": out("/srv/ab/r/wt/a\n"), **responses})
+
+
 def test_stop_keeps_worktree_by_default() -> None:
-    runner = _owned()
+    runner = _container_runner()
     stop_task(_shell(runner), HOST, "a", remove_worktree=False)
     cmds = runner.remote_commands()
     assert f"tmux kill-session -t ={SESSION}a" in cmds
+    assert f"docker ps -a --filter name={CONTAINER}a --format '{{{{.Names}}}}'" in cmds
     assert f"docker rm -f {CONTAINER}a" in cmds
     assert not any("worktree remove" in c for c in cmds)
+
+
+def test_stop_skips_absent_container() -> None:
+    runner = _owned()
+    stop_task(_shell(runner), HOST, "a", remove_worktree=False)
+    assert not any(c.startswith("docker rm") for c in runner.remote_commands())
+
+
+def test_stop_reports_container_removal_failure() -> None:
+    runner = _container_runner(**{"docker rm -f": fail("permission denied")})
+    with pytest.raises(RemoteError, match="Cannot remove container.*permission denied"):
+        stop_task(_shell(runner), HOST, "a", remove_worktree=True)
+    assert not any("worktree remove" in c for c in runner.remote_commands())
+
+
+def test_stop_reports_container_that_survives_removal() -> None:
+    runner = _container_runner()
+    runner.sticky = True
+    with pytest.raises(RemoteError, match="still present"):
+        stop_task(_shell(runner), HOST, "a", remove_worktree=False)
+
+
+def test_stop_reports_container_listing_failure() -> None:
+    runner = _owned(**{"docker ps": fail("Cannot connect to the Docker daemon")})
+    with pytest.raises(RemoteError, match="Cannot list docker containers"):
+        stop_task(_shell(runner), HOST, "a", remove_worktree=False)
+
+
+def test_stop_reports_session_kill_failure() -> None:
+    runner = _owned(**{"kill-session": fail("server exited unexpectedly")})
+    with pytest.raises(RemoteError, match="Cannot stop tmux session.*server exited"):
+        stop_task(_shell(runner), HOST, "a", remove_worktree=False)
+
+
+def test_stop_accepts_session_that_ended_before_kill() -> None:
+    class EndedRunner(FakeRunner):
+        def __call__(
+            self, argv: Sequence[str], *, input: str | None = None, tty: bool = False
+        ) -> CommandResult:
+            result = super().__call__(argv, input=input, tty=tty)
+            cmd = self.calls[-1].remote
+            has_session = [c for c in self.remote_commands() if "has-session" in c]
+            if "has-session" in cmd and len(has_session) > 1:
+                return fail("can't find session")
+            return result
+
+    runner = EndedRunner(
+        {"display-message": out("/srv/ab/r/wt/a\n"), "kill-session": fail("can't find session")}
+    )
+    stop_task(_shell(runner), HOST, "a", remove_worktree=False)
 
 
 def test_stop_refuses_dirty_worktree() -> None:

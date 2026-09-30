@@ -221,9 +221,10 @@ def stop_task(
     remove_worktree = remove_worktree and has_worktree
     if remove_worktree:
         _check_removable(shell, worktree, discard_ignored=discard_ignored)
-    shell.run(["tmux", "kill-session", "-t", _target(host, task)])
+    if has_session:
+        _kill_session(shell, host, task)
     # Killing tmux may leave the foreground container running.
-    shell.run([host.runtime, "rm", "-f", container_name(host, task)])
+    _remove_container(shell, host, task)
     if remove_worktree:
         shell.check(
             ["git", "-C", host.repo_dir, "worktree", "remove", worktree],
@@ -254,4 +255,34 @@ def _check_owned(shell: RemoteShell, host: RemoteHost, task: str, worktree: str)
         error=f"Cannot inspect task {task}",
     ).strip()
     if path != worktree:
-        raise RemoteError(f"tmux session of task {task} runs in {path}, not {worktree}; not stopping")
+        raise RemoteError(
+            f"tmux session of task {task} runs in {path}, not {worktree}; not stopping"
+        )
+
+
+def _kill_session(shell: RemoteShell, host: RemoteHost, task: str) -> None:
+    result = shell.run(["tmux", "kill-session", "-t", _target(host, task)])
+    if result.returncode == 0:
+        return
+    # The agent may have ended the session between the check and the kill.
+    if shell.run(["tmux", "has-session", "-t", _target(host, task)]).returncode == 1:
+        return
+    detail = result.stderr.strip() or f"exit {result.returncode}"
+    raise RemoteError(f"Cannot stop tmux session of task {task}: {detail}")
+
+
+def _container_exists(shell: RemoteShell, host: RemoteHost, name: str) -> bool:
+    names = shell.check(
+        [host.runtime, "ps", "-a", "--filter", f"name={name}", "--format", "{{.Names}}"],
+        error=f"Cannot list {host.runtime} containers",
+    )
+    return name in names.split()
+
+
+def _remove_container(shell: RemoteShell, host: RemoteHost, task: str) -> None:
+    name = container_name(host, task)
+    if not _container_exists(shell, host, name):
+        return
+    shell.check([host.runtime, "rm", "-f", name], error=f"Cannot remove container {name}")
+    if _container_exists(shell, host, name):
+        raise RemoteError(f"Container {name} is still present after removal")
