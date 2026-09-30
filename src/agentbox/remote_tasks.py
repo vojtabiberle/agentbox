@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shlex
 from collections.abc import Sequence
@@ -14,6 +15,7 @@ from .remote_ssh import RemoteShell
 
 SESSION_PREFIX = "agentbox-"
 CONTAINER_PREFIX = "agentbox-task-"
+SCOPE_LENGTH = 8
 _BRANCH = re.compile(r"[A-Za-z0-9._/-]+")
 # tmux rewrites "." and ":" in session names, so task names exclude them.
 _TASK = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]*")
@@ -27,17 +29,26 @@ class TaskStatus:
     state: Literal["running", "exited", "stopped"]
 
 
-def session_name(task: str) -> str:
-    return f"{SESSION_PREFIX}{task}"
+def _scope(host: RemoteHost) -> str:
+    # base_dir owns the clone and worktrees, so it separates registrations sharing one SSH host.
+    return hashlib.sha256(host.base_dir.encode()).hexdigest()[:SCOPE_LENGTH]
 
 
-def _target(task: str, *, pane: bool = False) -> str:
+def _session_prefix(host: RemoteHost) -> str:
+    return f"{SESSION_PREFIX}{_scope(host)}-"
+
+
+def session_name(host: RemoteHost, task: str) -> str:
+    return f"{_session_prefix(host)}{task}"
+
+
+def _target(host: RemoteHost, task: str, *, pane: bool = False) -> str:
     # "=" disables tmux prefix matching; the trailing ":" makes a pane target exact too.
-    return f"={session_name(task)}{':' if pane else ''}"
+    return f"={session_name(host, task)}{':' if pane else ''}"
 
 
-def container_name(task: str) -> str:
-    return f"{CONTAINER_PREFIX}{task}"
+def container_name(host: RemoteHost, task: str) -> str:
+    return f"{CONTAINER_PREFIX}{_scope(host)}-{task}"
 
 
 def _validate_task(task: str) -> None:
@@ -65,7 +76,7 @@ def start_task(
     _validate_task(task)
     _validate_branch(branch)
     worktree = _worktree(host, task)
-    if shell.run(["tmux", "has-session", "-t", _target(task)]).returncode == 0:
+    if shell.run(["tmux", "has-session", "-t", _target(host, task)]).returncode == 0:
         raise RemoteError(f"Task {task} is already running or exited; stop it first")
     if shell.run(["test", "-e", worktree]).returncode == 0:
         raise RemoteError(
@@ -91,7 +102,7 @@ def start_task(
             "--agent",
             agent,
             "--name",
-            container_name(task),
+            container_name(host, task),
             "--",
             *agent_args,
         ]
@@ -102,7 +113,7 @@ def start_task(
             "new-session",
             "-d",
             "-s",
-            session_name(task),
+            session_name(host, task),
             "-c",
             worktree,
             "bash",
@@ -113,7 +124,7 @@ def start_task(
             "set-option",
             "-t",
             # remain-on-exit is a window option; a bare "=session" target is read as a window.
-            _target(task, pane=True),
+            _target(host, task, pane=True),
             "remain-on-exit",
             "on",
         ],
@@ -164,10 +175,11 @@ def _sync_local_branch(shell: RemoteShell, host: RemoteHost, branch: str) -> Non
 def list_tasks(shell: RemoteShell, host: RemoteHost) -> list[TaskStatus]:
     panes = shell.run(["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_dead}"])
     alive: dict[str, bool] = {}
+    prefix = _session_prefix(host)
     for line in panes.stdout.splitlines() if panes.returncode == 0 else []:
         session, _, dead = line.rpartition(" ")
-        if session.startswith(SESSION_PREFIX):
-            task = session[len(SESSION_PREFIX) :]
+        if session.startswith(prefix):
+            task = session[len(prefix) :]
             alive[task] = alive.get(task, False) or dead != "1"
     worktrees = shell.run(["ls", "-1", host.worktrees_dir])
     names = set(worktrees.stdout.split()) if worktrees.returncode == 0 else set()
@@ -177,15 +189,15 @@ def list_tasks(shell: RemoteShell, host: RemoteHost) -> list[TaskStatus]:
     ]
 
 
-def attach_task(shell: RemoteShell, task: str) -> int:
+def attach_task(shell: RemoteShell, host: RemoteHost, task: str) -> int:
     _validate_task(task)
-    return shell.interactive(["tmux", "attach", "-t", _target(task)])
+    return shell.interactive(["tmux", "attach", "-t", _target(host, task)])
 
 
-def task_logs(shell: RemoteShell, task: str, tail: int) -> str:
+def task_logs(shell: RemoteShell, host: RemoteHost, task: str, tail: int) -> str:
     _validate_task(task)
     return shell.check(
-        ["tmux", "capture-pane", "-p", "-t", _target(task, pane=True), "-S", f"-{tail}"],
+        ["tmux", "capture-pane", "-p", "-t", _target(host, task, pane=True), "-S", f"-{tail}"],
         error=f"Cannot read output of task {task}",
     )
 
@@ -200,16 +212,18 @@ def stop_task(
 ) -> None:
     _validate_task(task)
     worktree = _worktree(host, task)
-    has_session = shell.run(["tmux", "has-session", "-t", _target(task)]).returncode == 0
+    has_session = shell.run(["tmux", "has-session", "-t", _target(host, task)]).returncode == 0
     has_worktree = shell.run(["test", "-d", worktree]).returncode == 0
     if not has_session and not has_worktree:
         raise RemoteError(f"Task {task} not found on the remote (no tmux session, no worktree)")
+    if has_session:
+        _check_owned(shell, host, task, worktree)
     remove_worktree = remove_worktree and has_worktree
     if remove_worktree:
         _check_removable(shell, worktree, discard_ignored=discard_ignored)
-    shell.run(["tmux", "kill-session", "-t", _target(task)])
+    shell.run(["tmux", "kill-session", "-t", _target(host, task)])
     # Killing tmux may leave the foreground container running.
-    shell.run([host.runtime, "rm", "-f", container_name(task)])
+    shell.run([host.runtime, "rm", "-f", container_name(host, task)])
     if remove_worktree:
         shell.check(
             ["git", "-C", host.repo_dir, "worktree", "remove", worktree],
@@ -232,3 +246,12 @@ def _check_removable(shell: RemoteShell, worktree: str, *, discard_ignored: bool
             f"Worktree {worktree} has ignored files ({', '.join(ignored)}); "
             "remove them or pass --discard-ignored"
         )
+
+
+def _check_owned(shell: RemoteShell, host: RemoteHost, task: str, worktree: str) -> None:
+    path = shell.check(
+        ["tmux", "display-message", "-p", "-t", _target(host, task, pane=True), "#{session_path}"],
+        error=f"Cannot inspect task {task}",
+    ).strip()
+    if path != worktree:
+        raise RemoteError(f"tmux session of task {task} runs in {path}, not {worktree}; not stopping")

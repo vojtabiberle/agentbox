@@ -111,7 +111,8 @@ def list_command(host: str) -> None:
 @click.argument("task")
 def attach(host: str, task: str) -> None:
     """Attach to a task's tmux session (detach with Ctrl+b d)."""
-    sys.exit(attach_task(make_shell(get_host(host)), task))
+    remote_host = get_host(host)
+    sys.exit(attach_task(make_shell(remote_host), remote_host, task))
 
 
 @remote.command()
@@ -120,7 +121,8 @@ def attach(host: str, task: str) -> None:
 @click.option("--tail", type=click.IntRange(min=1), default=200)
 def logs(host: str, task: str, tail: int) -> None:
     """Print recent task output."""
-    click.echo(task_logs(make_shell(get_host(host)), task, tail), nl=False)
+    remote_host = get_host(host)
+    click.echo(task_logs(make_shell(remote_host), remote_host, task, tail), nl=False)
 
 
 @remote.command()

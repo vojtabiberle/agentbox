@@ -70,7 +70,10 @@ def test_run_passes_dashed_flag_after_separator_unchanged() -> None:
 
 def test_list_prints_status() -> None:
     runner = FakeRunner(
-        {"list-panes": out("agentbox-t1 0\nagentbox-t3 1\n"), "ls -1": out("t1\nt2\nt3\n")}
+        {
+            "list-panes": out("agentbox-017054c5-t1 0\nagentbox-017054c5-t3 1\n"),
+            "ls -1": out("t1\nt2\nt3\n"),
+        }
     )
     result = _invoke(runner, ["list", "vm"])
     assert result.exit_code == 0

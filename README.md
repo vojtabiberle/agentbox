@@ -944,6 +944,9 @@ in session names). `remote list` prints one of three states per task: `running`
 (agent still running in its tmux session), `exited` (the agent ended; the tmux pane
 is kept, so `remote logs` still shows its output) and `stopped` (worktree left, no
 tmux session). Run `remote stop` before reusing the name of an exited task.
+tmux session and container names include a short hash of `base_dir`, so two
+registrations on the same SSH host can use the same task name; `remote stop` also
+refuses a session that does not run in this registration's worktree.
 `git worktree remove` also deletes Git-ignored files (for example `.env` or agent
 outputs), so `--remove-worktree` refuses a worktree that has any and lists them;
 add `--discard-ignored` to delete them.

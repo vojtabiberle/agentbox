@@ -23,10 +23,17 @@ HOST = RemoteHost(
     agent="claude",
     runtime="docker",
 )
+# sha256("/srv/ab/r")[:8]: names are scoped to the registration's base_dir.
+SESSION = "agentbox-017054c5-"
+CONTAINER = "agentbox-task-017054c5-"
 
 
 def _shell(runner: FakeRunner) -> RemoteShell:
     return RemoteShell("vm", runner)
+
+
+def _owned(**responses: CommandResult) -> FakeRunner:
+    return FakeRunner({"display-message": out("/srv/ab/r/wt/a\n"), **responses})
 
 
 def test_start_creates_worktree_and_session() -> None:
@@ -41,7 +48,7 @@ def test_start_creates_worktree_and_session() -> None:
         "new-session",
         "-d",
         "-s",
-        "agentbox-dmd-1",
+        SESSION + "dmd-1",
         "-c",
         "/srv/ab/r/wt/dmd-1",
     ]
@@ -52,7 +59,7 @@ def test_start_creates_worktree_and_session() -> None:
         "--agent",
         "claude",
         "--name",
-        "agentbox-task-dmd-1",
+        CONTAINER + "dmd-1",
         "--",
         "do it",
     ]
@@ -86,7 +93,7 @@ def test_start_refuses_running_task() -> None:
 class PrefixTmuxRunner(FakeRunner):
     """tmux resolves `-t name` by prefix; only `-t =name` is exact."""
 
-    sessions: tuple[str, ...] = ("agentbox-fix-2",)
+    sessions: tuple[str, ...] = (SESSION + "fix-2",)
 
     def __call__(
         self, argv: Sequence[str], *, input: str | None = None, tty: bool = False
@@ -109,8 +116,8 @@ def test_start_ignores_session_with_same_prefix() -> None:
     runner = PrefixTmuxRunner()
     start_task(_shell(runner), HOST, "fix", "main", "claude", [])
     cmds = runner.remote_commands()
-    assert cmds[0] == "tmux has-session -t =agentbox-fix"
-    assert any(c.startswith("tmux new-session -d -s agentbox-fix ") for c in cmds)
+    assert cmds[0] == f"tmux has-session -t ={SESSION}fix"
+    assert any(c.startswith(f"tmux new-session -d -s {SESSION}fix ") for c in cmds)
 
 
 def test_start_keeps_pane_after_agent_exits() -> None:
@@ -118,12 +125,12 @@ def test_start_keeps_pane_after_agent_exits() -> None:
     start_task(_shell(runner), HOST, "t", "main", "claude", [])
     last = shlex.split(runner.remote_commands()[-1])
     # One tmux invocation: a separate set-option call races an agent that exits at once.
-    assert last[:5] == ["tmux", "new-session", "-d", "-s", "agentbox-t"]
+    assert last[:5] == ["tmux", "new-session", "-d", "-s", SESSION + "t"]
     assert last[last.index(";") :] == [
         ";",
         "set-option",
         "-t",
-        "=agentbox-t:",
+        f"={SESSION}t:",
         "remain-on-exit",
         "on",
     ]
@@ -131,10 +138,10 @@ def test_start_keeps_pane_after_agent_exits() -> None:
 
 def test_attach_uses_exact_target() -> None:
     runner = FakeRunner()
-    attach_task(_shell(runner), "fix")
+    attach_task(_shell(runner), HOST, "fix")
     call = runner.calls[-1]
     assert call.tty is True
-    assert call.remote == "tmux attach -t =agentbox-fix"
+    assert call.remote == f"tmux attach -t ={SESSION}fix"
 
 
 def test_start_refuses_existing_worktree() -> None:
@@ -215,7 +222,9 @@ def test_start_surfaces_git_stderr_for_foreign_worktree() -> None:
 def test_list_combines_sessions_and_worktrees() -> None:
     runner = FakeRunner(
         {
-            "list-panes": out("agentbox-a 0\nagentbox-c 1\nother 0\n"),
+            "list-panes": out(
+                f"{SESSION}a 0\n{SESSION}c 1\nagentbox-00000000-d 0\nagentbox-e 0\nother 0\n"
+            ),
             "ls -1": out("a\nb\nc\n"),
         }
     )
@@ -236,40 +245,40 @@ def test_list_without_tmux_server() -> None:
 
 def test_logs_capture_pane() -> None:
     runner = FakeRunner({"capture-pane": out("line\n")})
-    assert task_logs(_shell(runner), "a", 50) == "line\n"
-    assert "tmux capture-pane -p -t =agentbox-a: -S -50" in runner.remote_commands()
+    assert task_logs(_shell(runner), HOST, "a", 50) == "line\n"
+    assert f"tmux capture-pane -p -t ={SESSION}a: -S -50" in runner.remote_commands()
 
 
 def test_stop_keeps_worktree_by_default() -> None:
-    runner = FakeRunner()
+    runner = _owned()
     stop_task(_shell(runner), HOST, "a", remove_worktree=False)
     cmds = runner.remote_commands()
-    assert "tmux kill-session -t =agentbox-a" in cmds
-    assert "docker rm -f agentbox-task-a" in cmds
+    assert f"tmux kill-session -t ={SESSION}a" in cmds
+    assert f"docker rm -f {CONTAINER}a" in cmds
     assert not any("worktree remove" in c for c in cmds)
 
 
 def test_stop_refuses_dirty_worktree() -> None:
-    runner = FakeRunner({"status --porcelain": out(" M file.py\n")})
+    runner = _owned(**{"status --porcelain": out(" M file.py\n")})
     with pytest.raises(RemoteError, match="uncommitted"):
         stop_task(_shell(runner), HOST, "a", remove_worktree=True)
     assert not any("worktree remove" in c for c in runner.remote_commands())
 
 
 def test_stop_removes_clean_worktree() -> None:
-    runner = FakeRunner({"status --porcelain": out("")})
+    runner = _owned(**{"status --porcelain": out("")})
     stop_task(_shell(runner), HOST, "a", remove_worktree=True)
     assert "git -C /srv/ab/r/repo worktree remove /srv/ab/r/wt/a" in runner.remote_commands()
 
 
 def test_stop_inspects_ignored_files() -> None:
-    runner = FakeRunner({"status --porcelain": out("")})
+    runner = _owned(**{"status --porcelain": out("")})
     stop_task(_shell(runner), HOST, "a", remove_worktree=True)
     assert "git -C /srv/ab/r/wt/a status --porcelain --ignored" in runner.remote_commands()
 
 
 def test_stop_refuses_worktree_with_ignored_files() -> None:
-    runner = FakeRunner({"status --porcelain": out("!! .env\n!! out/\n")})
+    runner = _owned(**{"status --porcelain": out("!! .env\n!! out/\n")})
     with pytest.raises(RemoteError, match=r"ignored files \(\.env, out/\).*--discard-ignored"):
         stop_task(_shell(runner), HOST, "a", remove_worktree=True)
     cmds = runner.remote_commands()
@@ -277,7 +286,7 @@ def test_stop_refuses_worktree_with_ignored_files() -> None:
 
 
 def test_stop_discards_ignored_files_on_request() -> None:
-    runner = FakeRunner({"status --porcelain": out("!! .env\n")})
+    runner = _owned(**{"status --porcelain": out("!! .env\n")})
     stop_task(_shell(runner), HOST, "a", remove_worktree=True, discard_ignored=True)
     assert "git -C /srv/ab/r/repo worktree remove /srv/ab/r/wt/a" in runner.remote_commands()
 
@@ -291,8 +300,26 @@ def test_stop_unknown_task_is_clear_error() -> None:
 
 
 def test_stop_without_worktree_still_stops_session() -> None:
-    runner = FakeRunner({"test -d /srv/ab/r/wt/a": fail("")})
+    runner = _owned(**{"test -d /srv/ab/r/wt/a": fail("")})
     stop_task(_shell(runner), HOST, "a", remove_worktree=True)
     cmds = runner.remote_commands()
-    assert "tmux kill-session -t =agentbox-a" in cmds
+    assert f"tmux kill-session -t ={SESSION}a" in cmds
     assert not any("status --porcelain" in c or "worktree remove" in c for c in cmds)
+
+
+def test_stop_refuses_session_of_another_registration() -> None:
+    runner = FakeRunner({"display-message": out("/srv/other/wt/a\n")})
+    with pytest.raises(RemoteError, match="runs in /srv/other/wt/a"):
+        stop_task(_shell(runner), HOST, "a", remove_worktree=False)
+    cmds = runner.remote_commands()
+    assert f"tmux display-message -p -t ={SESSION}a: '#{{session_path}}'" in cmds
+    assert not any(word in c for c in cmds for word in ("kill-session", "rm -f"))
+
+
+def test_same_task_name_on_two_registrations_does_not_collide() -> None:
+    other = HOST.model_copy(update={"base_dir": "/srv/ab/other"})
+    runner = FakeRunner({"tmux has-session": fail(""), "test -e": fail("")})
+    start_task(_shell(runner), HOST, "t", "main", "claude", [])
+    start_task(_shell(runner), other, "t", "main", "claude", [])
+    sessions = [shlex.split(c)[4] for c in runner.remote_commands() if "new-session" in c]
+    assert len(set(sessions)) == 2
