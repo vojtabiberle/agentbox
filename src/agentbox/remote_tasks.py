@@ -19,6 +19,8 @@ SCOPE_LENGTH = 8
 _BRANCH = re.compile(r"[A-Za-z0-9._/-]+")
 # tmux rewrites "." and ":" in session names, so task names exclude them.
 _TASK = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]*")
+# tmux without a running server: no socket yet, or a stale one.
+_NO_TMUX_SERVER = ("no server running", "error connecting to")
 # git >= 2.42 says "used by worktree at", older versions "already checked out at".
 _USED_BY_WORKTREE = re.compile(r"(?:worktree|checked out) at '([^']+)'")
 
@@ -173,20 +175,39 @@ def _sync_local_branch(shell: RemoteShell, host: RemoteHost, branch: str) -> Non
 
 
 def list_tasks(shell: RemoteShell, host: RemoteHost) -> list[TaskStatus]:
-    panes = shell.run(["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_dead}"])
     alive: dict[str, bool] = {}
     prefix = _session_prefix(host)
-    for line in panes.stdout.splitlines() if panes.returncode == 0 else []:
+    for line in _pane_lines(shell):
         session, _, dead = line.rpartition(" ")
         if session.startswith(prefix):
             task = session[len(prefix) :]
             alive[task] = alive.get(task, False) or dead != "1"
-    worktrees = shell.run(["ls", "-1", host.worktrees_dir])
-    names = set(worktrees.stdout.split()) if worktrees.returncode == 0 else set()
+    names = _worktree_names(shell, host)
     return [
         TaskStatus(name, "stopped" if name not in alive else "running" if alive[name] else "exited")
         for name in sorted(names | alive.keys())
     ]
+
+
+def _pane_lines(shell: RemoteShell) -> list[str]:
+    panes = shell.run(["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_dead}"])
+    if panes.returncode == 0:
+        return panes.stdout.splitlines()
+    if any(marker in panes.stderr for marker in _NO_TMUX_SERVER):
+        return []
+    detail = panes.stderr.strip() or f"exit {panes.returncode}"
+    raise RemoteError(f"Cannot list tmux sessions: {detail}")
+
+
+def _worktree_names(shell: RemoteShell, host: RemoteHost) -> set[str]:
+    listing = shell.run(["ls", "-1", host.worktrees_dir])
+    if listing.returncode == 0:
+        return set(listing.stdout.split())
+    # `test` exits 1 only for a missing path; ssh itself fails with 255.
+    if shell.run(["test", "-e", host.worktrees_dir]).returncode == 1:
+        return set()
+    detail = listing.stderr.strip() or f"exit {listing.returncode}"
+    raise RemoteError(f"Cannot list {host.worktrees_dir}: {detail}")
 
 
 def attach_task(shell: RemoteShell, host: RemoteHost, task: str) -> int:

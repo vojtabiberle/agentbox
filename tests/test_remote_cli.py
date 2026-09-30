@@ -81,10 +81,20 @@ def test_list_prints_status() -> None:
 
 
 def test_list_without_tasks_says_so() -> None:
-    runner = FakeRunner({"list-panes": fail("no server running"), "ls -1": fail("")})
+    runner = FakeRunner(
+        {"list-panes": fail("no server running"), "ls -1": fail(""), "test -e": fail("", 1)}
+    )
     result = _invoke(runner, ["list", "vm"])
     assert result.exit_code == 0
     assert result.output.strip() == "No tasks on vm"
+
+
+def test_list_reports_ssh_failure_instead_of_no_tasks() -> None:
+    runner = FakeRunner({"list-panes": fail("Connection refused", 255)})
+    result = _invoke(runner, ["list", "vm"])
+    assert result.exit_code != 0
+    assert "No tasks" not in result.output
+    assert "Connection refused" in result.output + str(result.exception)
 
 
 def test_unknown_host_is_clear_error() -> None:

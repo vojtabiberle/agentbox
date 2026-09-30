@@ -236,11 +236,36 @@ def test_list_combines_sessions_and_worktrees() -> None:
     assert "tmux list-panes -a -F '#{session_name} #{pane_dead}'" in runner.remote_commands()
 
 
-def test_list_without_tmux_server() -> None:
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        "no server running on /tmp/tmux-1000/default",
+        "error connecting to /tmp/tmux-1000/default (No such file or directory)",
+    ],
+)
+def test_list_without_tmux_server_or_worktrees(stderr: str) -> None:
     runner = FakeRunner(
-        {"list-panes": fail("no server running on /tmp/tmux-1000/default"), "ls -1": fail("")}
+        {"list-panes": fail(stderr), "ls -1": fail("No such file", 2), "test -e": fail("", 1)}
     )
     assert list_tasks(_shell(runner), HOST) == []
+
+
+def test_list_propagates_ssh_failure_from_tmux() -> None:
+    runner = FakeRunner({"list-panes": fail("ssh: connect to host vm: Connection refused", 255)})
+    with pytest.raises(RemoteError, match="Cannot list tmux sessions: ssh: connect"):
+        list_tasks(_shell(runner), HOST)
+
+
+def test_list_propagates_ssh_failure_from_worktree_listing() -> None:
+    runner = FakeRunner(
+        {
+            "list-panes": out(""),
+            "ls -1": fail("ssh: connect to host vm: Connection refused", 255),
+            "test -e": fail("ssh: connect to host vm: Connection refused", 255),
+        }
+    )
+    with pytest.raises(RemoteError, match="Cannot list /srv/ab/r/wt: ssh: connect"):
+        list_tasks(_shell(runner), HOST)
 
 
 def test_logs_capture_pane() -> None:
