@@ -183,7 +183,8 @@ def service_start(
 @click.argument("name")
 def service_status_command(host: str, name: str) -> None:
     """Show service status."""
-    click.echo(service_status(make_shell(get_host(host)), name), nl=False)
+    remote_host = get_host(host)
+    click.echo(service_status(make_shell(remote_host), remote_host, name), nl=False)
 
 
 @service.command(name="logs")
@@ -192,7 +193,8 @@ def service_status_command(host: str, name: str) -> None:
 @click.option("--tail", type=click.IntRange(min=0), default=100)
 def service_logs_command(host: str, name: str, tail: int) -> None:
     """Show service logs."""
-    click.echo(service_logs(make_shell(get_host(host)), name, tail), nl=False)
+    remote_host = get_host(host)
+    click.echo(service_logs(make_shell(remote_host), remote_host, name, tail), nl=False)
 
 
 @service.command(name="stop")
@@ -200,4 +202,5 @@ def service_logs_command(host: str, name: str, tail: int) -> None:
 @click.argument("name")
 def service_stop(host: str, name: str) -> None:
     """Stop a service."""
-    click.echo(stop_service(make_shell(get_host(host)), name), nl=False)
+    remote_host = get_host(host)
+    click.echo(stop_service(make_shell(remote_host), remote_host, name), nl=False)

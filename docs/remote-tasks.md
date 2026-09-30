@@ -95,7 +95,7 @@ Expected stops on a fresh host, each fixed by re-running after the action:
 | --- | --- | --- |
 | tools | `Install on the remote: pipx` | install it (section 3) |
 | github | `Run in your terminal: ssh -t <dest> gh auth login ...` | run it, choose HTTPS and "authenticate Git", confirm the device code |
-| remote-config | confirmation prompt | answer `y` |
+| remote-config | confirmation prompt for `<base_dir>/agentbox.yaml` | answer `y` |
 
 The `image` step builds the agent image without printing progress; the first build
 takes a few minutes. A finished run ends with `INFO login: ...`.
@@ -105,7 +105,7 @@ takes a few minutes. A finished run ends with `INFO login: ...`.
 Run the printed command, for example:
 
 ```bash
-ssh -t <dest> "bash -lc 'agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent claude'"
+ssh -t <dest> "bash -lc 'env AGENTBOX_CONFIG=/home/<user>/agentbox-remote/<repo>/agentbox.yaml agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent claude'"
 ```
 
 - Claude Code asks to accept "Bypass Permissions mode". It runs inside the task
@@ -136,7 +136,7 @@ step:
 
 ```bash
 agentbox remote service stop <host> hermes
-ssh -t <dest> "bash -lc 'agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent hermes -- setup'"
+ssh -t <dest> "bash -lc 'env AGENTBOX_CONFIG=/home/<user>/agentbox-remote/<repo>/agentbox.yaml agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent hermes -- setup'"
 ```
 
 Choices that worked:
@@ -153,7 +153,7 @@ WhatsApp (Baileys bridge, unofficial API, account ban risk; a dedicated number i
 recommended, self-chat mode works for a single user):
 
 ```bash
-ssh -t <dest> "bash -lc 'agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent hermes -- whatsapp'"
+ssh -t <dest> "bash -lc 'env AGENTBOX_CONFIG=/home/<user>/agentbox-remote/<repo>/agentbox.yaml agentbox run /home/<user>/agentbox-remote/<repo>/repo --agent hermes -- whatsapp'"
 agentbox remote service setup <host>
 ```
 

@@ -277,48 +277,83 @@ def _check_tracked_config(
     )
 
 
+def _override(base: dict[str, Any], desired: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in desired.items():
+        merged[key] = (
+            _override(dict(base.get(key) or {}), value) if isinstance(value, dict) else value
+        )
+    return merged
+
+
+def _global_config(shell: RemoteShell) -> dict[str, Any] | StepResult:
+    for candidate in GLOBAL_CONFIG_CANDIDATES:
+        result = shell.run(["cat", candidate])
+        if result.returncode == 0:
+            return _parse_config(f"~/{candidate}", result.stdout)
+    return {}
+
+
 def _remote_config(
-    shell: RemoteShell, prompter: Prompter | None, runtime: str, repo_dir: str
+    shell: RemoteShell, prompter: Prompter | None, runtime: str, host: RemoteHost
 ) -> StepResult:
     desired = _desired_config(runtime)
     for name in REPO_CONFIG_NAMES:
-        repo_file = f"{repo_dir}/{name}"
+        repo_file = f"{host.repo_dir}/{name}"
         if shell.run(["test", "-f", repo_file]).returncode == 0:
-            return _check_tracked_config(shell, repo_file, desired)
+            tracked = _check_tracked_config(shell, repo_file, desired)
+            if tracked.status != "ok":
+                return tracked
+            break
 
-    target = GLOBAL_CONFIG_CANDIDATES[0]
-    current: dict[str, Any] = {}
-    for candidate in GLOBAL_CONFIG_CANDIDATES:
-        result = shell.run(["cat", candidate])
+    # Commands outside a worktree (services, `agentbox build`) read this file, not a tracked one.
+    target = host.config_file
+    exists = shell.run(["test", "-f", target])
+    if exists.returncode not in (0, 1):
+        detail = exists.stderr.strip() or f"exit {exists.returncode}"
+        return StepResult("remote-config", "action", f"Cannot inspect {target}: {detail}")
+    if exists.returncode == 0:
+        result = shell.run(["cat", target])
         if result.returncode != 0:
-            continue
-        parsed = _parse_config(candidate, result.stdout)
-        if isinstance(parsed, StepResult):
-            return parsed
-        target, current = candidate, parsed
-        break
-
-    merged, missing, conflicts = _merge(current, desired)
-    if conflicts:
-        return StepResult(
-            "remote-config",
-            "action",
-            f"Edit ~/{target} on the remote: " + "; ".join(conflicts),
-        )
-    if not missing:
-        return StepResult("remote-config", "ok", f"~/{target}")
-    if prompter is None or not prompter.confirm(f"Add {', '.join(missing)} to remote ~/{target}?"):
-        return StepResult("remote-config", "action", f"missing {', '.join(missing)}")
+            detail = result.stderr.strip() or f"exit {result.returncode}"
+            return StepResult("remote-config", "action", f"Cannot read {target}: {detail}")
+        current = _parse_config(target, result.stdout)
+        if isinstance(current, StepResult):
+            return current
+        merged, missing, conflicts = _merge(current, desired)
+        if conflicts:
+            return StepResult(
+                "remote-config", "action", f"Edit {target} on the remote: " + "; ".join(conflicts)
+            )
+        if not missing:
+            return StepResult("remote-config", "ok", target)
+        question = f"Add {', '.join(missing)} to remote {target}?"
+    else:
+        # Seeded once from the remote user's global config, which itself stays untouched.
+        base = _global_config(shell)
+        if isinstance(base, StepResult):
+            return base
+        merged, (_, missing, _) = _override(base, desired), _merge({}, desired)
+        question = f"Create remote {target} for agentbox remote tasks?"
+    if prompter is None or not prompter.confirm(question):
+        return StepResult("remote-config", "action", f"{target}: missing {', '.join(missing)}")
     shell.write_file(target, yaml.safe_dump(merged, sort_keys=False))
-    return StepResult("remote-config", "fixed", ", ".join(missing))
+    return StepResult("remote-config", "fixed", f"{target}: {', '.join(missing)}")
 
 
-def _image(shell: RemoteShell, repo: str, agent: str) -> StepResult:
+def _image(shell: RemoteShell, host: RemoteHost) -> StepResult:
     shell.check(
-        ["bash", "-c", 'cd "$1" && agentbox build --agent "$2"', "_", repo, agent],
-        error=f"Cannot build the {agent} image",
+        [
+            "bash",
+            "-c",
+            'cd "$1" && shift && "$@"',
+            "_",
+            host.repo_dir,
+            *host.agentbox("build", "--agent", host.agent),
+        ],
+        error=f"Cannot build the {host.agent} image",
     )
-    return StepResult("image", "ok", agent)
+    return StepResult("image", "ok", host.agent)
 
 
 def _ssh_command(destination: str, command: list[str]) -> str:
@@ -328,8 +363,10 @@ def _ssh_command(destination: str, command: list[str]) -> str:
     return f"ssh -t {shlex.quote(destination)} {quoted}"
 
 
-def _login_hint(shell: RemoteShell, repo: str, agent: str) -> StepResult:
-    command = _ssh_command(shell.destination, ["agentbox", "run", repo, "--agent", agent])
+def _login_hint(shell: RemoteShell, host: RemoteHost) -> StepResult:
+    command = _ssh_command(
+        shell.destination, host.agentbox("run", host.repo_dir, "--agent", host.agent)
+    )
     return StepResult("login", "info", f"Log the agent in once: {command}")
 
 
@@ -388,10 +425,10 @@ def run_setup(
     results.append(_repository(shell, host.repository, host.base_dir, write=True))
     if stop():
         return results
-    results.append(_remote_config(shell, prompter, runtime, host.repo_dir))
+    results.append(_remote_config(shell, prompter, runtime, host))
     if stop():
         return results
-    results.append(_image(shell, host.repo_dir, host.agent))
+    results.append(_image(shell, host))
     if stop():
         return results
     if existing != host:
@@ -399,7 +436,7 @@ def run_setup(
         results.append(StepResult("save", "fixed", name))
     else:
         results.append(StepResult("save", "ok", name))
-    results.append(_login_hint(shell, host.repo_dir, host.agent))
+    results.append(_login_hint(shell, host))
     return results
 
 
@@ -414,7 +451,7 @@ def run_doctor(host: RemoteHost, shell: RemoteShell, *, local_version: str) -> l
         _agentbox(shell, None, local_version, None),
         _github(shell),
         _repository(shell, host.repository, host.base_dir, write=False),
-        _remote_config(shell, None, host.runtime, host.repo_dir),
-        _login_hint(shell, host.repo_dir, host.agent),
+        _remote_config(shell, None, host.runtime, host),
+        _login_hint(shell, host),
     ]
     return results

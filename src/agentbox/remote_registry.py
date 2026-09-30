@@ -9,9 +9,11 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
+from .config import CONFIG_ENV
 from .exceptions import ConfigError, RemoteError
 
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*")
+CONFIG_FILE = "agentbox.yaml"
 
 
 class RemoteHost(BaseModel):
@@ -44,6 +46,14 @@ class RemoteHost(BaseModel):
     @property
     def worktrees_dir(self) -> str:
         return f"{self.base_dir}/wt"
+
+    @property
+    def config_file(self) -> str:
+        return f"{self.base_dir}/{CONFIG_FILE}"
+
+    def agentbox(self, *args: str) -> list[str]:
+        # Remote-task settings stay out of the remote user's global config.
+        return ["env", f"{CONFIG_ENV}={self.config_file}", "agentbox", *args]
 
 
 def validate_remote_name(name: str) -> None:

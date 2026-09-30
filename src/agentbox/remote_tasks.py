@@ -97,8 +97,7 @@ def start_task(
         error=f"Cannot create worktree for {branch}",
     )
     inner = shlex.join(
-        [
-            "agentbox",
+        host.agentbox(
             "run",
             worktree,
             "--agent",
@@ -107,7 +106,7 @@ def start_task(
             container_name(host, task),
             "--",
             *agent_args,
-        ]
+        )
     )
     shell.check(
         [

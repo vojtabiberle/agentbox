@@ -53,6 +53,8 @@ def test_start_creates_worktree_and_session() -> None:
         "/srv/ab/r/wt/dmd-1",
     ]
     assert shlex.split(tmux[tmux.index(";") - 1]) == [
+        "env",
+        "AGENTBOX_CONFIG=/srv/ab/r/agentbox.yaml",
         "agentbox",
         "run",
         "/srv/ab/r/wt/dmd-1",

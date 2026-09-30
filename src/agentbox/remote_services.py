@@ -14,7 +14,7 @@ RESTART_POLICIES = ("no", "on-failure:3", "unless-stopped")
 
 def setup_service(shell: RemoteShell, host: RemoteHost) -> int:
     return shell.interactive(
-        ["agentbox", "run", host.repo_dir, "--agent", "hermes", "--", "gateway", "setup"]
+        host.agentbox("run", host.repo_dir, "--agent", "hermes", "--", "gateway", "setup")
     )
 
 
@@ -30,8 +30,7 @@ def start_service(
         raise ConfigError(f"Invalid restart policy: {restart_policy}")
     env_args = [arg for key in forwarded_env for arg in ("--env", key)]
     return shell.check(
-        [
-            "agentbox",
+        host.agentbox(
             "service",
             "start",
             host.repo_dir,
@@ -40,25 +39,31 @@ def start_service(
             "--restart-policy",
             restart_policy,
             *env_args,
-        ],
+        ),
         error=f"Cannot start service {name}",
     )
 
 
-def service_status(shell: RemoteShell, name: str) -> str:
+def service_status(shell: RemoteShell, host: RemoteHost, name: str) -> str:
     validate_name(name)
-    return shell.check(["agentbox", "service", "status", name], error=f"Cannot inspect {name}")
+    return shell.check(host.agentbox("service", "status", name), error=f"Cannot inspect {name}")
 
 
-def service_logs(shell: RemoteShell, name: str, tail: int) -> str:
+def service_logs(shell: RemoteShell, host: RemoteHost, name: str, tail: int) -> str:
     validate_name(name)
     # Container stderr is part of the service log, not an ssh diagnostic.
     return shell.check(
-        ["bash", "-c", '"$@" 2>&1', "_", "agentbox", "service", "logs", name, "--tail", str(tail)],
+        [
+            "bash",
+            "-c",
+            '"$@" 2>&1',
+            "_",
+            *host.agentbox("service", "logs", name, "--tail", str(tail)),
+        ],
         error=f"Cannot read logs of {name}",
     )
 
 
-def stop_service(shell: RemoteShell, name: str) -> str:
+def stop_service(shell: RemoteShell, host: RemoteHost, name: str) -> str:
     validate_name(name)
-    return shell.check(["agentbox", "service", "stop", name], error=f"Cannot stop {name}")
+    return shell.check(host.agentbox("service", "stop", name), error=f"Cannot stop {name}")

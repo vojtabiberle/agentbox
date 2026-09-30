@@ -18,6 +18,8 @@ from tests.remote_fakes import FakeRunner, fail, out
 
 VERSION = "0.5.0a1"
 DESIRED = {"runtime": "docker", "credentials": {"github": True}, "state_scope": "repository"}
+SCOPED = "/srv/ab/r/agentbox.yaml"
+GLOBAL = ".config/agentbox/config.yaml"
 
 
 def _no_wheel() -> nullcontext[None]:
@@ -53,14 +55,10 @@ def _healthy(**overrides: object) -> FakeRunner:
         "agentbox --version": out(f"agentbox, version {VERSION}\n"),
         "remote get-url origin": out("git@github.com:o/r.git\n"),
         "symbolic-ref -q HEAD": fail(""),
-        # No repo-tracked config by default; the wizard falls back to the global files.
+        # No repo-tracked config by default; remote tasks use the scoped file under base_dir.
         "test -f /srv/ab/r/repo/.agentbox.yaml": fail(""),
         "test -f /srv/ab/r/repo/.agentbox.yml": fail(""),
-        "cat .config/agentbox/config.yaml": out(
-            yaml.safe_dump(
-                {"runtime": "docker", "credentials": {"github": True}, "state_scope": "repository"}
-            )
-        ),
+        f"cat {SCOPED}": out(yaml.safe_dump(DESIRED)),
     }
     responses.update(overrides)  # type: ignore[arg-type]
     return FakeRunner(responses)
@@ -231,39 +229,6 @@ def test_doctor_reports_attached_clone_without_detaching() -> None:
     assert not any("checkout" in c for c in runner.remote_commands())
 
 
-def test_remote_config_conflict_not_overwritten(tmp_path: Path) -> None:
-    runner = _healthy(**{"cat .config/agentbox/config.yaml": out("runtime: podman\n")})
-    results = run_setup(
-        "vm",
-        RemoteShell("vm", runner),
-        ScriptedPrompter(ANSWERS),
-        local_version=VERSION,
-        wheel_builder=_no_wheel,
-        registry=tmp_path / "r.yaml",
-    )
-    assert results[-1].name == "remote-config" and results[-1].status == "action"
-    assert "runtime" in results[-1].detail
-    assert not any(c.input is not None for c in runner.calls)
-
-
-def test_remote_config_adds_missing_keys_after_confirmation(tmp_path: Path) -> None:
-    runner = _healthy(**{"cat .config/agentbox/config.yaml": fail("No such file")})
-    run_setup(
-        "vm",
-        RemoteShell("vm", runner),
-        ScriptedPrompter(ANSWERS),
-        local_version=VERSION,
-        wheel_builder=_no_wheel,
-        registry=tmp_path / "r.yaml",
-    )
-    written = [c.input for c in runner.calls if c.input is not None]
-    assert yaml.safe_load(written[-1]) == {
-        "runtime": "docker",
-        "credentials": {"github": True},
-        "state_scope": "repository",
-    }
-
-
 def test_successful_setup_saves_registry(tmp_path: Path) -> None:
     registry = tmp_path / "r.yaml"
     results = run_setup(
@@ -314,58 +279,6 @@ def test_repo_tracked_config_wins_and_is_not_written(tmp_path: Path) -> None:
     )
     assert results[-1].name == "remote-config" and results[-1].status == "action"
     assert "/srv/ab/r/repo/.agentbox.yaml" in results[-1].detail
-    assert not any(c.input is not None for c in runner.calls)
-
-
-def test_remote_config_merges_into_existing_yml_variant(tmp_path: Path) -> None:
-    runner = _healthy(
-        **{
-            "cat .config/agentbox/config.yaml": fail("No such file"),
-            "cat .config/agentbox/config.yml": out(yaml.safe_dump({"runtime": "docker"})),
-        }
-    )
-    run_setup(
-        "vm",
-        RemoteShell("vm", runner),
-        ScriptedPrompter(ANSWERS),
-        local_version=VERSION,
-        wheel_builder=_no_wheel,
-        registry=tmp_path / "r.yaml",
-    )
-    writes = [c for c in runner.calls if c.input is not None]
-    assert writes and writes[-1].remote.endswith(".config/agentbox/config.yml")
-    assert yaml.safe_load(writes[-1].input) == {
-        "runtime": "docker",
-        "credentials": {"github": True},
-        "state_scope": "repository",
-    }
-
-
-def test_remote_config_non_mapping_is_action(tmp_path: Path) -> None:
-    runner = _healthy(**{"cat .config/agentbox/config.yaml": out("- just\n- a\n- list\n")})
-    results = run_setup(
-        "vm",
-        RemoteShell("vm", runner),
-        ScriptedPrompter(ANSWERS),
-        local_version=VERSION,
-        wheel_builder=_no_wheel,
-        registry=tmp_path / "r.yaml",
-    )
-    assert results[-1].name == "remote-config" and results[-1].status == "action"
-    assert not any(c.input is not None for c in runner.calls)
-
-
-def test_remote_config_malformed_yaml_is_action(tmp_path: Path) -> None:
-    runner = _healthy(**{"cat .config/agentbox/config.yaml": out("runtime: [unterminated\n")})
-    results = run_setup(
-        "vm",
-        RemoteShell("vm", runner),
-        ScriptedPrompter(ANSWERS),
-        local_version=VERSION,
-        wheel_builder=_no_wheel,
-        registry=tmp_path / "r.yaml",
-    )
-    assert results[-1].name == "remote-config" and results[-1].status == "action"
     assert not any(c.input is not None for c in runner.calls)
 
 
@@ -455,6 +368,8 @@ def test_login_hint_uses_login_shell(tmp_path: Path) -> None:
     remote = shlex.split(" ".join(ssh[3:]))
     assert remote[:2] == ["bash", "-lc"]
     assert shlex.split(remote[2]) == [
+        "env",
+        f"AGENTBOX_CONFIG={SCOPED}",
         "agentbox",
         "run",
         "/srv/ab/r/repo",
@@ -550,3 +465,109 @@ def test_force_reinstall_installs_same_version_after_confirmation(tmp_path: Path
     assert any("agentbox" in text for text in prompter.confirmed)
     assert f"pipx install --force agentbox=={VERSION}" in runner.remote_commands()
     assert {r.name: r.status for r in results}["agentbox"] == "fixed"
+
+
+def _writes(runner: FakeRunner) -> list[Any]:
+    return [c for c in runner.calls if c.input is not None]
+
+
+def test_remote_config_is_created_under_base_dir_not_global(tmp_path: Path) -> None:
+    global_config = {"runtime": "podman", "toolsets": ["base", "go"], "credentials": {"aws": True}}
+    runner = _healthy(
+        **{
+            f"test -f {SCOPED}": fail("", 1),
+            f"cat {GLOBAL}": out(yaml.safe_dump(global_config)),
+        }
+    )
+    results = _setup(runner, tmp_path)
+    assert _statuses(results)["remote-config"] == "fixed"
+    writes = _writes(runner)
+    assert len(writes) == 1 and writes[0].remote.endswith(SCOPED)
+    # Seeded from the global file, with the remote-task keys overriding it.
+    assert yaml.safe_load(writes[0].input) == {
+        "runtime": "docker",
+        "toolsets": ["base", "go"],
+        "credentials": {"aws": True, "github": True},
+        "state_scope": "repository",
+    }
+
+
+def test_remote_config_created_from_scratch_without_global(tmp_path: Path) -> None:
+    runner = _healthy(**{f"test -f {SCOPED}": fail("", 1), "cat .config": fail("No such file")})
+    _setup(runner, tmp_path)
+    assert yaml.safe_load(_writes(runner)[-1].input) == DESIRED
+
+
+def test_remote_config_creation_needs_confirmation(tmp_path: Path) -> None:
+    runner = _healthy(**{f"test -f {SCOPED}": fail("", 1)})
+    results = run_setup(
+        "vm",
+        RemoteShell("vm", runner),
+        ScriptedPrompter(ANSWERS, confirm=False),
+        local_version=VERSION,
+        wheel_builder=_no_wheel,
+        registry=tmp_path / "r.yaml",
+    )
+    assert results[-1].name == "remote-config" and results[-1].status == "action"
+    assert not _writes(runner)
+
+
+def test_remote_config_adds_missing_keys_to_scoped_file(tmp_path: Path) -> None:
+    runner = _healthy(**{f"cat {SCOPED}": out(yaml.safe_dump({"toolsets": ["base"]}))})
+    results = _setup(runner, tmp_path)
+    assert _statuses(results)["remote-config"] == "fixed"
+    assert yaml.safe_load(_writes(runner)[-1].input) == {"toolsets": ["base"], **DESIRED}
+
+
+def test_remote_config_conflict_in_scoped_file_not_overwritten(tmp_path: Path) -> None:
+    runner = _healthy(**{f"cat {SCOPED}": out("runtime: podman\n")})
+    results = _setup(runner, tmp_path)
+    assert results[-1].name == "remote-config" and results[-1].status == "action"
+    assert SCOPED in results[-1].detail and "runtime" in results[-1].detail
+    assert not _writes(runner)
+
+
+@pytest.mark.parametrize("content", ["runtime: [unterminated\n", "- just\n- a\n- list\n"])
+def test_remote_config_malformed_scoped_file_is_action(tmp_path: Path, content: str) -> None:
+    runner = _healthy(**{f"cat {SCOPED}": out(content)})
+    results = _setup(runner, tmp_path)
+    assert results[-1].name == "remote-config" and results[-1].status == "action"
+    assert not _writes(runner)
+
+
+def test_remote_config_ssh_failure_is_action(tmp_path: Path) -> None:
+    runner = _healthy(**{f"test -f {SCOPED}": fail("Connection reset", 255)})
+    results = _setup(runner, tmp_path)
+    assert results[-1].name == "remote-config" and results[-1].status == "action"
+    assert "Connection reset" in results[-1].detail
+    assert not _writes(runner)
+
+
+def test_setup_never_touches_global_config(tmp_path: Path) -> None:
+    runner = _healthy(**{f"test -f {SCOPED}": fail("", 1)})
+    _setup(runner, tmp_path)
+    assert not any(GLOBAL in c.remote for c in _writes(runner))
+
+
+def test_tracked_config_ok_still_manages_scoped_file(tmp_path: Path) -> None:
+    runner = _tracked(yaml.safe_dump(DESIRED))
+    runner.responses[f"test -f {SCOPED}"] = fail("", 1)
+    results = _setup(runner, tmp_path)
+    assert _statuses(results)["remote-config"] == "fixed"
+    assert _writes(runner)[-1].remote.endswith(SCOPED)
+
+
+def test_image_build_uses_scoped_config(tmp_path: Path) -> None:
+    runner = _healthy()
+    _setup(runner, tmp_path)
+    build = next(c for c in runner.remote_commands() if "agentbox build" in c)
+    assert shlex.split(build)[3:] == [
+        "_",
+        "/srv/ab/r/repo",
+        "env",
+        f"AGENTBOX_CONFIG={SCOPED}",
+        "agentbox",
+        "build",
+        "--agent",
+        "claude",
+    ]

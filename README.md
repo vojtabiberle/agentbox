@@ -271,6 +271,9 @@ agentbox looks for configuration in this order:
 2. `~/.config/agentbox/config.yaml` or `config.yml` (global config)
 3. `~/.agentbox.yaml` (legacy global config)
 
+If `AGENTBOX_CONFIG` names a file, it replaces steps 2 and 3 (a project config still
+wins); a missing file is an error. Remote tasks use this for their scoped config.
+
 Use `agentbox config init` to create a config file:
 
 ```bash
@@ -887,23 +890,26 @@ checks that `gh` is installed (otherwise it points to https://cli.github.com) an
 then `gh auth status`; `repository` clones or verifies the configured Git
 repository and detaches its HEAD, so no branch (including the default branch) is held
 by the primary clone and every branch can be checked out in a task worktree;
-`remote-config` adds `runtime`, `credentials.github` and
-`state_scope: repository`. Agentbox loads the first config file it finds
-(repository-tracked `.agentbox.yaml`/`.yml`, then the remote user's global
-`~/.config/agentbox/config.yaml`/`.yml` or `~/.agentbox.yaml`) and never merges
-across files. If the repository tracks its own config, the wizard reads it and never
-writes it: when it already has the three keys with the required values the step is
-`ok` and setup continues; otherwise it reports `action` naming the file and only the
-missing or conflicting keys to fix there. Without a tracked config it adds the keys actually missing from the first existing global file —
-creating `~/.config/agentbox/config.yaml` only if none exists — after asking for
-confirmation. A key already present with a different value is reported, never
-overwritten; `image` builds the container image so the
+`remote-config` makes sure remote tasks get `runtime`, `credentials.github` and
+`state_scope: repository` without changing other agentbox runs on the host: every
+remote `agentbox` command runs with `AGENTBOX_CONFIG=<base_dir>/agentbox.yaml`, and
+the remote user's global config is never written. Agentbox loads the first config
+file it finds (repository-tracked `.agentbox.yaml`/`.yml`, then that scoped file) and
+never merges across files. If the repository tracks its own config, the wizard reads
+it and never writes it: when it has the three keys with the required values
+setup continues; otherwise it reports `action` naming the file and only the missing
+or conflicting keys to fix there. The scoped file is still needed for commands that
+run outside a worktree (services, `agentbox build`). If it does not exist yet, the
+wizard creates it after asking for confirmation, seeded once from the remote
+user's first existing global config with the three keys set. If it exists, the
+wizard adds only missing keys and reports a key with a different value instead of
+overwriting it; `image` builds the container image so the
 first task does not wait for it; `save` writes the registry entry; `login` is
 informational only — it prints the command to log the agent in once on the remote
 and is not verified automatically, since agent credentials are not inspected:
 
 ```bash
-ssh -t agent-runner.example.com "bash -lc 'agentbox run /home/user/agentbox-remote/myproject/repo --agent claude'"
+ssh -t agent-runner.example.com "bash -lc 'env AGENTBOX_CONFIG=/home/user/agentbox-remote/myproject/agentbox.yaml agentbox run /home/user/agentbox-remote/myproject/repo --agent claude'"
 ```
 
 The login shell (`bash -lc`) puts the pipx-installed `agentbox` on `PATH`.

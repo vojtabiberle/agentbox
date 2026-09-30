@@ -19,6 +19,7 @@ HOST = RemoteHost(
     agent="claude",
     runtime="docker",
 )
+ENV = "env AGENTBOX_CONFIG=/srv/ab/r/agentbox.yaml"
 
 
 def test_setup_runs_gateway_setup_with_tty() -> None:
@@ -26,7 +27,7 @@ def test_setup_runs_gateway_setup_with_tty() -> None:
     setup_service(RemoteShell("vm", runner), HOST)
     call = runner.calls[-1]
     assert call.tty is True
-    assert call.remote == "agentbox run /srv/ab/r/repo --agent hermes -- gateway setup"
+    assert call.remote == f"{ENV} agentbox run /srv/ab/r/repo --agent hermes -- gateway setup"
 
 
 def test_start_passes_policy_and_env_names() -> None:
@@ -36,7 +37,7 @@ def test_start_passes_policy_and_env_names() -> None:
     )
     assert result == "Created bot: abc\n"
     assert runner.remote_commands()[-1] == (
-        "agentbox service start /srv/ab/r/repo --name bot --restart-policy unless-stopped"
+        f"{ENV} agentbox service start /srv/ab/r/repo --name bot --restart-policy unless-stopped"
         " --env OPENAI_API_KEY"
     )
 
@@ -44,19 +45,19 @@ def test_start_passes_policy_and_env_names() -> None:
 def test_status_logs_stop_pass_through() -> None:
     runner = FakeRunner({"service status": out("bot: running\n")})
     shell = RemoteShell("vm", runner)
-    assert service_status(shell, "bot") == "bot: running\n"
-    service_logs(shell, "bot", 20)
-    stop_service(shell, "bot")
+    assert service_status(shell, HOST, "bot") == "bot: running\n"
+    service_logs(shell, HOST, "bot", 20)
+    stop_service(shell, HOST, "bot")
     assert runner.remote_commands()[1:] == [
-        "bash -c '\"$@\" 2>&1' _ agentbox service logs bot --tail 20",
-        "agentbox service stop bot",
+        f"bash -c '\"$@\" 2>&1' _ {ENV} agentbox service logs bot --tail 20",
+        f"{ENV} agentbox service stop bot",
     ]
 
 
 def test_invalid_service_name_rejected_before_ssh() -> None:
     runner = FakeRunner()
     with pytest.raises(ConfigError):
-        service_status(RemoteShell("vm", runner), "--all")
+        service_status(RemoteShell("vm", runner), HOST, "--all")
     assert runner.calls == []
 
 

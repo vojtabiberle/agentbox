@@ -130,7 +130,7 @@ def _healthy_setup_runner() -> FakeRunner:
             "remote get-url origin": out("git@github.com:o/r.git\n"),
             "test -f /srv/ab/r/repo/.agentbox.yaml": fail(""),
             "test -f /srv/ab/r/repo/.agentbox.yml": fail(""),
-            "cat .config/agentbox/config.yaml": out(
+            "cat /srv/ab/r/agentbox.yaml": out(
                 yaml.safe_dump(
                     {
                         "runtime": "docker",
