@@ -127,10 +127,21 @@ def logs(host: str, task: str, tail: int) -> None:
 @click.argument("host")
 @click.argument("task")
 @click.option("--remove-worktree", is_flag=True)
-def stop(host: str, task: str, remove_worktree: bool) -> None:
+@click.option(
+    "--discard-ignored",
+    is_flag=True,
+    help="With --remove-worktree, also delete Git-ignored files in the worktree",
+)
+def stop(host: str, task: str, remove_worktree: bool, discard_ignored: bool) -> None:
     """Stop a task; keeps its worktree unless --remove-worktree."""
     remote_host = get_host(host)
-    stop_task(make_shell(remote_host), remote_host, task, remove_worktree=remove_worktree)
+    stop_task(
+        make_shell(remote_host),
+        remote_host,
+        task,
+        remove_worktree=remove_worktree,
+        discard_ignored=discard_ignored,
+    )
     click.echo(f"Stopped {task}")
 
 

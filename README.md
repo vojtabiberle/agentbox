@@ -936,7 +936,7 @@ agentbox remote run agent-runner --name fix-123 --branch fix-123 -- "fix the fai
 agentbox remote list agent-runner
 agentbox remote attach agent-runner fix-123     # detach with Ctrl+b d
 agentbox remote logs agent-runner fix-123 --tail 200
-agentbox remote stop agent-runner fix-123 --remove-worktree   # refused if the worktree is dirty
+agentbox remote stop agent-runner fix-123 --remove-worktree   # refused if dirty or holding ignored files
 ```
 
 Task names match `[a-zA-Z0-9][a-zA-Z0-9_-]*` (no dots or colons: tmux rewrites them
@@ -944,6 +944,9 @@ in session names). `remote list` prints one of three states per task: `running`
 (agent still running in its tmux session), `exited` (the agent ended; the tmux pane
 is kept, so `remote logs` still shows its output) and `stopped` (worktree left, no
 tmux session). Run `remote stop` before reusing the name of an exited task.
+`git worktree remove` also deletes Git-ignored files (for example `.env` or agent
+outputs), so `--remove-worktree` refuses a worktree that has any and lists them;
+add `--discard-ignored` to delete them.
 
 `--branch` must already exist on the remote's Git origin. The remote default branch
 works like any other. If the primary clone has a stale local copy of the branch, it

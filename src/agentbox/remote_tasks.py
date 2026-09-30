@@ -190,7 +190,14 @@ def task_logs(shell: RemoteShell, task: str, tail: int) -> str:
     )
 
 
-def stop_task(shell: RemoteShell, host: RemoteHost, task: str, *, remove_worktree: bool) -> None:
+def stop_task(
+    shell: RemoteShell,
+    host: RemoteHost,
+    task: str,
+    *,
+    remove_worktree: bool,
+    discard_ignored: bool = False,
+) -> None:
     _validate_task(task)
     worktree = _worktree(host, task)
     has_session = shell.run(["tmux", "has-session", "-t", _target(task)]).returncode == 0
@@ -199,13 +206,7 @@ def stop_task(shell: RemoteShell, host: RemoteHost, task: str, *, remove_worktre
         raise RemoteError(f"Task {task} not found on the remote (no tmux session, no worktree)")
     remove_worktree = remove_worktree and has_worktree
     if remove_worktree:
-        dirty = shell.check(
-            ["git", "-C", worktree, "status", "--porcelain"], error=f"Cannot inspect {worktree}"
-        )
-        if dirty.strip():
-            raise RemoteError(
-                f"Worktree {worktree} has uncommitted changes; commit or push them first"
-            )
+        _check_removable(shell, worktree, discard_ignored=discard_ignored)
     shell.run(["tmux", "kill-session", "-t", _target(task)])
     # Killing tmux may leave the foreground container running.
     shell.run([host.runtime, "rm", "-f", container_name(task)])
@@ -213,4 +214,21 @@ def stop_task(shell: RemoteShell, host: RemoteHost, task: str, *, remove_worktre
         shell.check(
             ["git", "-C", host.repo_dir, "worktree", "remove", worktree],
             error=f"Cannot remove {worktree}",
+        )
+
+
+def _check_removable(shell: RemoteShell, worktree: str, *, discard_ignored: bool) -> None:
+    # `git worktree remove` deletes ignored files (.env, agent outputs) without asking.
+    status = shell.check(
+        ["git", "-C", worktree, "status", "--porcelain", "--ignored"],
+        error=f"Cannot inspect {worktree}",
+    )
+    lines = [line for line in status.splitlines() if line.strip()]
+    if any(not line.startswith("!! ") for line in lines):
+        raise RemoteError(f"Worktree {worktree} has uncommitted changes; commit or push them first")
+    ignored = [line[3:] for line in lines]
+    if ignored and not discard_ignored:
+        raise RemoteError(
+            f"Worktree {worktree} has ignored files ({', '.join(ignored)}); "
+            "remove them or pass --discard-ignored"
         )
