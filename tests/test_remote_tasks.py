@@ -258,6 +258,20 @@ def test_list_propagates_ssh_failure_from_tmux() -> None:
         list_tasks(_shell(runner), HOST)
 
 
+@pytest.mark.parametrize(
+    ("stderr", "returncode"),
+    [
+        ("error connecting to /tmp/tmux-1000/default (Operation not permitted)", 1),
+        ("error connecting to /tmp/tmux-1000/default (Permission denied)", 1),
+        ("no server running on /tmp/tmux-1000/default", 255),
+    ],
+)
+def test_list_propagates_tmux_connection_errors(stderr: str, returncode: int) -> None:
+    runner = FakeRunner({"list-panes": fail(stderr, returncode)})
+    with pytest.raises(RemoteError, match="Cannot list tmux sessions: "):
+        list_tasks(_shell(runner), HOST)
+
+
 def test_list_propagates_ssh_failure_from_worktree_listing() -> None:
     runner = FakeRunner(
         {

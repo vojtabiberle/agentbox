@@ -19,8 +19,10 @@ SCOPE_LENGTH = 8
 _BRANCH = re.compile(r"[A-Za-z0-9._/-]+")
 # tmux rewrites "." and ":" in session names, so task names exclude them.
 _TASK = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]*")
-# tmux without a running server: no socket yet, or a stale one.
-_NO_TMUX_SERVER = ("no server running", "error connecting to")
+# tmux without a running server: a stale socket (ECONNREFUSED) or no socket at all (ENOENT).
+_NO_TMUX_SERVER = re.compile(
+    r"^no server running|^error connecting to .* \(No such file or directory\)$", re.M
+)
 # git >= 2.42 says "used by worktree at", older versions "already checked out at".
 _USED_BY_WORKTREE = re.compile(r"(?:worktree|checked out) at '([^']+)'")
 
@@ -192,7 +194,8 @@ def _pane_lines(shell: RemoteShell) -> list[str]:
     panes = shell.run(["tmux", "list-panes", "-a", "-F", "#{session_name} #{pane_dead}"])
     if panes.returncode == 0:
         return panes.stdout.splitlines()
-    if any(marker in panes.stderr for marker in _NO_TMUX_SERVER):
+    # ssh exits 255 on transport errors.
+    if panes.returncode != 255 and _NO_TMUX_SERVER.search(panes.stderr):
         return []
     detail = panes.stderr.strip() or f"exit {panes.returncode}"
     raise RemoteError(f"Cannot list tmux sessions: {detail}")
