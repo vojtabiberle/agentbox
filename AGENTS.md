@@ -29,6 +29,7 @@ calls separate from default CI; they require user-configured authentication.
 - `git.py`: detects worktrees and required Git directory mounts.
 - `image.py`: resolves toolsets, renders Dockerfiles and computes image tags.
 - `agents/`: Agent interface and Claude/Hermes integrations.
+- `remote_*.py`: SSH transport, registry, tasks, services and setup wizard for remote hosts.
 - `plugins/`: YAML manifests, discovery and dependency resolution.
 - `templates/Dockerfile.j2`: shared image skeleton with plugin fragments.
 

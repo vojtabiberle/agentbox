@@ -100,7 +100,12 @@ def prepare_run(
             raise ConfigError(f"Environment variable is not set: {key}")
     workspace = workspace.resolve()
     host_home = str(Path.home())
-    home = state_home(config.state_dir, workspace, agent.name if agent is not None else "shell")
+    home = state_home(
+        config.state_dir,
+        workspace,
+        agent.name if agent is not None else "shell",
+        config.state_scope,
+    )
     try:
         if not dry_run:
             home.mkdir(parents=True, exist_ok=True, mode=0o700)

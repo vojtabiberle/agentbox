@@ -32,6 +32,10 @@ class ConfigError(AgentboxError):
     pass
 
 
+class RemoteError(AgentboxError):
+    """A remote host command failed or the remote is not configured."""
+
+
 class UnknownAgentError(AgentboxError):
     """Unknown agent name specified."""
 

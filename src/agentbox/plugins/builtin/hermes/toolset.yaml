@@ -11,8 +11,12 @@ dockerfile: |
       && git remote add origin https://github.com/NousResearch/hermes-agent.git \
       && git fetch --depth=1 origin 4716ec0ba4e212105f8f162c226f052b25f8a76b \
       && git checkout --detach FETCH_HEAD \
-      && uv sync --frozen --no-dev --python python3.13 \
+      && uv sync --frozen --no-dev --extra anthropic --python python3.13 \
       && ln -s /opt/hermes/.venv/bin/hermes /usr/local/bin/hermes
+  # The gateway runs as the host UID and re-runs npm install here when its stamp file is missing.
+  RUN cd /opt/hermes/scripts/whatsapp-bridge \
+      && npm ci --omit=dev --no-audit --no-fund \
+      && chmod -R a+rwX /opt/hermes/scripts/whatsapp-bridge
 environment:
   HERMES_HOME: /home/user/.hermes
   TERMINAL_ENV: local

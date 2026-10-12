@@ -1,5 +1,6 @@
 """Configuration management for agentbox."""
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -8,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from agentbox.exceptions import ConfigError
 from agentbox.plugins.models import MountConfig
+
+CONFIG_ENV = "AGENTBOX_CONFIG"
 
 
 class CredentialsConfig(BaseModel):
@@ -59,18 +62,29 @@ class Config(BaseModel):
     image_name: str = "agentbox"
     prebuilt_image: str | None = None
     state_dir: Path = Field(default_factory=lambda: Path.home() / ".local/state/agentbox")
+    state_scope: Literal["workspace", "repository"] = "workspace"
+
+
+def _override_path() -> Path | None:
+    value = os.environ.get(CONFIG_ENV)
+    return Path(value) if value else None
 
 
 def get_config_paths(workspace: Path | None = None) -> list[Path]:
     """Return list of config file paths to check, in priority order."""
     project = workspace if workspace is not None else Path.cwd()
-    return [
-        project / ".agentbox.yaml",
-        project / ".agentbox.yml",
-        Path.home() / ".config" / "agentbox" / "config.yaml",
-        Path.home() / ".config" / "agentbox" / "config.yml",
-        Path.home() / ".agentbox.yaml",
-    ]
+    override = _override_path()
+    # The override replaces only the global files; a project file still wins.
+    fallback = (
+        [override]
+        if override
+        else [
+            Path.home() / ".config" / "agentbox" / "config.yaml",
+            Path.home() / ".config" / "agentbox" / "config.yml",
+            Path.home() / ".agentbox.yaml",
+        ]
+    )
+    return [project / ".agentbox.yaml", project / ".agentbox.yml", *fallback]
 
 
 def load_config(workspace: Path | None = None) -> tuple[Config, Path | None]:
@@ -109,6 +123,9 @@ def load_config(workspace: Path | None = None) -> tuple[Config, Path | None]:
                     + "\n  Fix the values or run 'agentbox config init --force' to recreate"
                 ) from None
 
+    override = _override_path()
+    if override:
+        raise ConfigError(f"{CONFIG_ENV} points to a missing config file: {override}")
     return Config(), None
 
 

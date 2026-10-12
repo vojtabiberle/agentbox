@@ -111,3 +111,13 @@ remaining findings and update instructions. Raw findings remain visible.
 - [x] Live provider probe: Claude Code → Unix broker → Anthropic Haiku, with Secret Manager credentials outside the workload.
 - [x] Live one-shot review: repository-authorized DEV token, real PR diff through the GitHub controller socket, Anthropic response and unchanged head SHA verified. No GitHub comment published.
 - [ ] Complete DEV acceptance: secret rotation, scheduled trigger/publication and measured one-command onboarding within 15 minutes. One-shot pilot used staged startup and withheld publication.
+
+## Remote tasks and services over SSH (preview)
+
+- [x] Implemented: setup wizard, doctor, task run/list/attach/logs/stop and Hermes
+  service management on an SSH host, laptop-side registry, `state_scope: repository`.
+- [x] Real-host validation: the [manual acceptance checklist](docs/specs/2026-09-25-remote-tasks-design.md#manual-acceptance)
+  passed on an Ubuntu 24.04 GCP VM (IAP, OS Login, Docker): wizard from a fresh host, agent login,
+  a task surviving a closed laptop, stop/cleanup, an immediately failing task kept as `exited`
+  with its output, and a Hermes gateway with Anthropic OAuth, WhatsApp and a scheduled cron job.
+- [ ] Rootless Podman host: the linger check (task survives SSH logout) is not validated yet.

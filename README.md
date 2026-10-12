@@ -176,6 +176,11 @@ agentbox server run WORKSPACE             Run an administrator-approved workload
 agentbox server broker                   Serve the credential/egress broker
 agentbox server review-once              Poll assigned PRs for reference review
 
+agentbox remote setup|doctor HOST          Prepare/validate an SSH host for remote tasks
+agentbox remote run HOST --name T --branch B [-- ARGS]   Start a task in a worktree + tmux session
+agentbox remote list|attach|logs|stop HOST [TASK]        Manage remote tasks
+agentbox remote service setup|start|status|logs|stop HOST [NAME]   Hermes gateway on the remote
+
 agentbox upgrade             Upgrade agentbox (if installed via install.sh)
 ```
 
@@ -265,6 +270,9 @@ agentbox looks for configuration in this order:
 1. `.agentbox.yaml` or `.agentbox.yml` in the target workspace for `run`, otherwise the current directory (project config)
 2. `~/.config/agentbox/config.yaml` or `config.yml` (global config)
 3. `~/.agentbox.yaml` (legacy global config)
+
+If `AGENTBOX_CONFIG` names a file, it replaces steps 2 and 3 (a project config still
+wins); a missing file is an error. Remote tasks use this for their scoped config.
 
 Use `agentbox config init` to create a config file:
 
@@ -814,6 +822,11 @@ senders using Hermes platform settings before accepting bot traffic. Agentbox
 runs the foreground gateway under container supervision, without installing host
 system services, sharing host bot credentials or publishing inbound ports.
 
+The Hermes image includes the `anthropic` extra and the WhatsApp bridge
+dependencies, so the Anthropic provider (API key or Claude account OAuth) and
+WhatsApp work without installing anything at runtime.
+Pair WhatsApp once with `agentbox run --agent hermes ~/project -- whatsapp`.
+
 ```bash
 agentbox service start ~/project --name project-bot --env OPENAI_API_KEY
 agentbox service status project-bot
@@ -838,6 +851,146 @@ verify the configured platform separately. Provider/bot tokens must be explicitl
 configured or forwarded with `--env NAME`; platform configuration is never
 inferred from host files. Logs are emitted by Hermes and may contain sensitive
 application output. No authenticated third-party bot traffic is exercised by CI.
+
+### Remote tasks
+
+Start an agent task from your laptop and let it run on an always-on Linux host over
+SSH (for example a private VM reachable via IAP). The laptop only needs to be open to
+start, attach or inspect a task; closing it does not stop the task.
+
+For preparing a host from scratch (SSH over IAP, Docker access, `gh`, agent login,
+Hermes and WhatsApp) and known problems, follow the
+[remote host setup guide](docs/remote-tasks.md).
+
+Prerequisites on the remote host: Podman or Docker usable by the SSH user without
+`sudo`, `git`, `tmux`, `pipx`, outbound network access, and `gh` logged in if tasks
+push or open PRs. The remote runs the local `run`/`service` profile; `deploy/gcp`
+(the networkless, broker-only `server` profile) is not a target for remote tasks.
+
+Register and validate a host with the setup wizard, re-runnable and safe to stop and
+resume:
+
+```bash
+agentbox remote setup agent-runner --ssh agent-runner.example.com
+agentbox remote setup agent-runner   # re-run: defaults --ssh to the stored/host value
+agentbox remote doctor agent-runner  # read-only re-check, no changes
+```
+
+Each run prints one line per step and stops at the first step that needs action:
+
+```
+ssh, runtime, tools, agentbox, github, repository, remote-config, image, save, login
+```
+
+`ssh` checks connectivity; `runtime` detects Podman/Docker; `tools` requires `git`,
+`tmux` and `pipx`; `agentbox` installs/upgrades the remote CLI to match the laptop
+version (a source checkout is streamed to the remote as a base64-encoded wheel over
+the SSH connection, otherwise `pipx install agentbox==<version>` is used); `github`
+checks that `gh` is installed (otherwise it points to https://cli.github.com) and
+then `gh auth status`; `repository` clones or verifies the configured Git
+repository and detaches its HEAD, so no branch (including the default branch) is held
+by the primary clone and every branch can be checked out in a task worktree;
+`remote-config` makes sure remote tasks get `runtime`, `credentials.github` and
+`state_scope: repository` without changing other agentbox runs on the host: every
+remote `agentbox` command runs with `AGENTBOX_CONFIG=<base_dir>/agentbox.yaml`, and
+the remote user's global config is never written. Agentbox loads the first config
+file it finds (repository-tracked `.agentbox.yaml`/`.yml`, then that scoped file) and
+never merges across files. If the repository tracks its own config, the wizard reads
+it and never writes it: when it has the three keys with the required values
+setup continues; otherwise it reports `action` naming the file and only the missing
+or conflicting keys to fix there. The scoped file is still needed for commands that
+run outside a worktree (services, `agentbox build`). If it does not exist yet, the
+wizard creates it after asking for confirmation, seeded once from the remote
+user's first existing global config with the three keys set. If it exists, the
+wizard adds only missing keys and reports a key with a different value instead of
+overwriting it; `image` builds the container image so the
+first task does not wait for it; `save` writes the registry entry; `login` is
+informational only — it prints the command to log the agent in once on the remote
+and is not verified automatically, since agent credentials are not inspected:
+
+```bash
+ssh -t agent-runner.example.com "bash -lc 'env AGENTBOX_CONFIG=/home/user/agentbox-remote/myproject/agentbox.yaml agentbox run /home/user/agentbox-remote/myproject/repo --agent claude'"
+```
+
+The login shell (`bash -lc`) puts the pipx-installed `agentbox` on `PATH`.
+
+If the remote's GitHub CLI was logged in with `gh auth login --web` (HTTPS), use an
+HTTPS repository URL (`https://github.com/org/repo.git`); an SSH URL needs a separate
+SSH key on the remote.
+
+Registered hosts live in `~/.config/agentbox/remotes.yaml`, written only by
+`remote setup`:
+
+```yaml
+remotes:
+  agent-runner:
+    ssh: agent-runner.example.com
+    repository: git@github.com:org/repo.git
+    base_dir: /home/user/agentbox-remote/myproject   # absolute path on the remote
+    agent: claude
+    runtime: docker
+```
+
+All five keys are required; `runtime` is detected by the wizard, the rest come from
+the user. The file contains no credentials.
+
+Each task gets its own Git worktree under `<base_dir>/wt/<task>` and its own tmux
+session, so it survives an SSH disconnect:
+
+```bash
+agentbox remote run agent-runner --name fix-123 --branch fix-123 -- "fix the failing test"
+agentbox remote list agent-runner
+agentbox remote attach agent-runner fix-123     # detach with Ctrl+b d
+agentbox remote logs agent-runner fix-123 --tail 200
+agentbox remote stop agent-runner fix-123 --remove-worktree   # refused if dirty or holding ignored files
+```
+
+Task names match `[a-zA-Z0-9][a-zA-Z0-9_-]*` (no dots or colons: tmux rewrites them
+in session names). `remote list` prints one of three states per task: `running`
+(agent still running in its tmux session), `exited` (the agent ended; the tmux pane
+is kept, so `remote logs` still shows its output) and `stopped` (worktree left, no
+tmux session). Run `remote stop` before reusing the name of an exited task.
+tmux session and container names include a short hash of `base_dir`, so two
+registrations on the same SSH host can use the same task name; `remote stop` also
+refuses a session that does not run in this registration's worktree.
+`git worktree remove` also deletes Git-ignored files (for example `.env` or agent
+outputs), so `--remove-worktree` refuses a worktree that has any and lists them;
+add `--discard-ignored` to delete them.
+
+`--branch` must already exist on the remote's Git origin. The remote default branch
+works like any other. If the primary clone has a stale local copy of the branch, it
+is fast-forwarded to `origin/<branch>`; if the local branch has commits not on
+origin, `remote run` refuses to start (push or delete it first). A branch that is
+already checked out by another task is refused with that task's name. `remote run` does not
+transfer uncommitted or untracked laptop changes, and there is no session handoff
+between the laptop and the remote. Unknown options before `--` are rejected;
+everything after `--` is forwarded to the agent unchanged.
+
+A Hermes gateway can run the same way. `remote service setup` configures the
+repository's Hermes HOME interactively (it takes no service/container name — Hermes
+setup is per repository, not per container); `start`/`status`/`logs`/`stop` manage
+the named service container through the existing `agentbox service` commands, which
+are Hermes-only:
+
+```bash
+agentbox remote service setup agent-runner
+agentbox remote service start agent-runner hermes --restart-policy unless-stopped
+agentbox remote service status agent-runner hermes
+agentbox remote service logs agent-runner hermes --tail 100   # includes container stderr
+agentbox remote service stop agent-runner hermes
+```
+
+All task and service worktrees share one private agent HOME per repository through
+`state_scope: repository` (default remains `workspace`, keyed per worktree path).
+`state_scope: repository` requires a Git repository and keys the HOME by the Git
+common directory instead of the worktree path. Switching an existing setup to
+`state_scope: repository` starts with a new, empty HOME, so the agent needs a new
+login; `agentbox state reset` then deletes the HOME shared by all worktrees of the
+repository.
+
+Limits: no transfer of uncommitted laptop changes, no live session handoff, no
+nested Docker/Compose inside the task container, and no task queue — each
+`remote run` starts immediately.
 
 ### Prebuilt images
 

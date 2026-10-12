@@ -12,14 +12,27 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Literal
 
 from .exceptions import ConfigError
+from .git import detect_worktree
 
 
-def state_home(root: Path, workspace: Path, agent: str) -> Path:
+def state_home(
+    root: Path,
+    workspace: Path,
+    agent: str,
+    scope: Literal["workspace", "repository"] = "workspace",
+) -> Path:
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", agent):
         raise ConfigError("Invalid agent state name")
-    digest = hashlib.sha256(str(workspace.resolve()).encode()).hexdigest()[:16]
+    key = workspace.resolve()
+    if scope == "repository":
+        info = detect_worktree(workspace)
+        if info is None:
+            raise ConfigError(f"state_scope 'repository' requires a Git repository: {workspace}")
+        key = info.git_common_dir.resolve()
+    digest = hashlib.sha256(str(key).encode()).hexdigest()[:16]
     home = root.expanduser().resolve() / digest / agent / "home"
     validate_home(home)
     return home

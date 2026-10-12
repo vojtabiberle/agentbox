@@ -15,6 +15,7 @@ from agentbox.config import (
     save_global_config,
     save_project_config,
 )
+from agentbox.exceptions import ConfigError
 
 
 class TestDefaultConfig:
@@ -151,6 +152,55 @@ class TestLoadConfig:
         config, config_path = load_config()
         assert config.runtime == "docker"
         assert config_path == config_file
+class TestConfigOverride:
+    """AGENTBOX_CONFIG replaces the global files but not a project file."""
+
+    @pytest.fixture
+    def dirs(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+        home, project = tmp_path / "home", tmp_path / "project"
+        (home / ".config" / "agentbox").mkdir(parents=True)
+        project.mkdir()
+        (home / ".config" / "agentbox" / "config.yaml").write_text("runtime: podman\n")
+        monkeypatch.setattr(Path, "home", lambda: home)
+        monkeypatch.chdir(project)
+        return home, project
+
+    def test_override_replaces_global_config(
+        self, dirs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        override = tmp_path / "remote.yaml"
+        override.write_text("runtime: docker\nstate_scope: repository\n")
+        monkeypatch.setenv("AGENTBOX_CONFIG", str(override))
+        config, path = load_config()
+        assert path == override
+        assert config.runtime == "docker" and config.state_scope == "repository"
+
+    def test_project_config_wins_over_override(
+        self, dirs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, project = dirs
+        (project / ".agentbox.yaml").write_text("toolsets: [base, go]\n")
+        override = tmp_path / "remote.yaml"
+        override.write_text("runtime: docker\n")
+        monkeypatch.setenv("AGENTBOX_CONFIG", str(override))
+        config, path = load_config()
+        assert path == project / ".agentbox.yaml"
+        assert config.toolsets == ["base", "go"]
+
+    def test_missing_override_fails_fast(
+        self, dirs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AGENTBOX_CONFIG", str(tmp_path / "missing.yaml"))
+        with pytest.raises(ConfigError, match="AGENTBOX_CONFIG points to a missing"):
+            load_config()
+
+    def test_without_override_global_config_is_used(
+        self, dirs: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AGENTBOX_CONFIG", raising=False)
+        config, path = load_config()
+        assert path is not None and path.name == "config.yaml"
+        assert config.runtime == "podman"
 
 
 class TestSaveGlobalConfig:

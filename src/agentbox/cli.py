@@ -28,6 +28,7 @@ from .execution import prepare_run
 from .git import GitWorktreeInfo, detect_worktree
 from .image import ImageBuilder
 from .plugins import PluginManager
+from .remote_cli import remote
 from .review import review_main  # noqa: F401
 from .server import server
 from .service_cli import service
@@ -50,7 +51,7 @@ def main(ctx: click.Context) -> None:
     ctx.ensure_object(dict)
 
     # Run must resolve its workspace before loading project configuration.
-    if ctx.invoked_subcommand in {"run", "state", "service", "doctor", "server"}:
+    if ctx.invoked_subcommand in {"run", "state", "service", "doctor", "server", "remote"}:
         return
 
     # Commands that can run even with invalid config
@@ -79,6 +80,7 @@ main.add_command(doctor)
 main.add_command(state)
 main.add_command(service)
 main.add_command(server)
+main.add_command(remote)
 
 
 @main.command()
