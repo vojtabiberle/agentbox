@@ -94,6 +94,7 @@ an operational prerequisite.
 - [x] Pin patched upstream git-lfs, gh, yq, npm and pip; verify installer checksums.
 - [x] Document version-specific reachability evidence for residual Go module matches.
 - [x] Add offline functional package-manager tests and block Critical findings before publication.
+- [x] Rebuild pinned Git LFS/gh/yq sources with Go 1.27.2 and x/net 0.60.0 for GO-2026-6604/6612.
 
 See [the security assessment](docs/SECURITY_ASSESSMENT.md) for original advisories,
 remaining findings and update instructions. Raw findings remain visible.
