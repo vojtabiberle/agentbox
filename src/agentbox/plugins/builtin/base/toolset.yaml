@@ -15,18 +15,29 @@ dockerfile: |
       curl tar gzip \
       && dnf clean all
 
-  # Upstream tools carry patched Go dependencies ahead of Fedora rebuilds.
+  # Release binaries still embed vulnerable Go stdlib/x/net; rebuild pinned sources.
   RUN set -eu; case "$(uname -m)" in \
-      x86_64) arch=amd64; lfs_sha=e455e00f15d9b95661b8d53498ffb0c3367962cf1ec73c31ab7369516cd6ab8d; gh_sha=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8; yq_sha=c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385 ;; \
-      aarch64) arch=arm64; lfs_sha=ac9c8efac980bb0505ead384d087e2acb6486fd8498691a2165fa174ec6118c2; gh_sha=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f; yq_sha=88a1016bc1d657375a35864e4f44b6f333df8ff97b559f51bba0adcb2169df09 ;; \
+      x86_64) arch=amd64; go_sha=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5 ;; \
+      aarch64) arch=arm64; go_sha=94f3e30b8e374bc285e7dadc11e0865726b9bc6e85b841ccceaabc0214c6b7c8 ;; \
       *) echo "Unsupported architecture" >&2; exit 1 ;; esac; \
       mkdir /tmp/agentbox-tools; cd /tmp/agentbox-tools; \
-      curl -fsSL "https://github.com/git-lfs/git-lfs/releases/download/v3.8.0/git-lfs-linux-${arch}-v3.8.0.tar.gz" -o lfs.tar.gz; \
-      curl -fsSL "https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_${arch}.tar.gz" -o gh.tar.gz; \
-      curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_${arch}" -o yq; \
-      printf '%s  %s\n' "$lfs_sha" lfs.tar.gz "$gh_sha" gh.tar.gz "$yq_sha" yq | sha256sum -c -; \
-      tar -xzf lfs.tar.gz; tar -xzf gh.tar.gz; \
-      install -m 755 git-lfs-3.8.0/git-lfs gh_2.101.0_linux_${arch}/bin/gh yq /usr/local/bin/; \
+      curl -fsSL "https://go.dev/dl/go1.27.2.linux-${arch}.tar.gz" -o go.tar.gz; \
+      curl -fsSL https://codeload.github.com/git-lfs/git-lfs/tar.gz/refs/tags/v3.8.0 -o lfs.tar.gz; \
+      curl -fsSL https://codeload.github.com/cli/cli/tar.gz/refs/tags/v2.102.0 -o gh.tar.gz; \
+      curl -fsSL https://codeload.github.com/mikefarah/yq/tar.gz/refs/tags/v4.54.1 -o yq.tar.gz; \
+      printf '%s  %s\n' "$go_sha" go.tar.gz \
+          a12ecfc17ebee002d1f6acca79442029d41cbf5e5b4ba9e02249ed96de20300f lfs.tar.gz \
+          08bf0ef8b4409893889175e0f5279d30d6edd96465816042c0d7c72eac598158 gh.tar.gz \
+          0cec36e7035dd56c508bda56245cbd71e4495d2317bc2528165c4162bce79335 yq.tar.gz | sha256sum -c -; \
+      for archive in go lfs gh yq; do tar -xzf "$archive.tar.gz"; done; \
+      export PATH="/tmp/agentbox-tools/go/bin:$PATH" GOTOOLCHAIN=local CGO_ENABLED=0 \
+          GOPATH=/tmp/agentbox-tools/gopath GOCACHE=/tmp/agentbox-tools/cache; \
+      cd git-lfs-3.8.0; go get golang.org/x/net@v0.60.0; \
+      go build -trimpath -o /usr/local/bin/git-lfs .; \
+      cd ../cli-2.102.0; go get golang.org/x/net@v0.60.0; \
+      go build -trimpath -ldflags '-X github.com/cli/cli/v2/internal/build.Version=2.102.0' -o /usr/local/bin/gh ./cmd/gh; \
+      cd ../yq-4.54.1; go get golang.org/x/net@v0.60.0; \
+      go build -trimpath -o /usr/local/bin/yq .; \
       git lfs install --system; \
       cd /; rm -rf /tmp/agentbox-tools
 

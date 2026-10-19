@@ -5,6 +5,30 @@ Assessed 2026-09-17. Scope: the Linux amd64 base/Python/PHP images published wit
 Raw Grype matches are package-version matches, not proof of exploitable code paths.
 No findings are hidden by scanner exclusions or blanket CVE waivers.
 
+## 2026-10-19 CI remediation
+
+Run [39240653084](https://github.com/vojtabiberle/agentbox/actions/runs/39240653084)
+blocked all three stacks with GO-2026-6604 and GO-2026-6612 in the shared
+`/usr/local/bin/git-lfs`, `gh` and `yq` binaries. The reports require Go 1.27.2
+and `golang.org/x/net` 0.60.0. Even current upstream gh/yq release binaries
+still embed older versions; Git LFS has no newer release.
+
+Rebuild checksum-pinned Git LFS 3.8.0, gh 2.102.0 and yq 4.54.1 sources with
+checksum-pinned Go 1.27.2, upgrading x/net to 0.60.0 before compilation.
+`GOTOOLCHAIN=local` prevents implicit compiler changes; `CGO_ENABLED=0` keeps the
+binaries independent of build-host C libraries. Remove build inputs and caches
+in the same layer. Critical findings continue to block publication without waivers.
+Local Linux amd64 validation: all three images built, passed offline tool/package
+smoke tests and passed `verify-image-reports.py` against fresh Syft/Grype reports.
+Each scan reports 0 Critical, 4 High, 7 Medium, 1 Low and 2 Unknown findings;
+non-critical findings remain visible. SBOM metadata confirms Go 1.27.2 and
+x/net 0.60.0 in all three rebuilt binaries. ARM64 execution remains untested.
+The Python test suite passed on system Python 3.10: 560 passed, 23 skipped.
+Ruff and mypy passed. Available Python 3.12/3.14 builds lack `os.memfd_create`,
+causing one unrelated broker test failure on those local interpreters.
+
+The original assessment below describes the previous remediation.
+
 ## Assessment and fixes
 
 | Component | Exposure and decision | Replacement |

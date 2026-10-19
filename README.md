@@ -1084,6 +1084,11 @@ every installed RPM name/version appears in the SBOM and that scan metadata iden
 Fedora. Critical findings and scan/tool failures block publication. Other findings remain
 in the reports and require assessment; they are not automatically waived or treated as
 a clean bill of health. See [the dependency assessment](docs/SECURITY_ASSESSMENT.md).
+The base toolset rebuilds Git LFS 3.8.0, GitHub CLI 2.102.0 and yq 4.54.1
+from checksum-pinned sources using Go 1.27.2 and `golang.org/x/net` 0.60.0.
+The temporary Go toolchain, source trees and module caches are removed in the same
+build layer. This covers both amd64 and arm64; released binaries still embed older
+Go dependencies.
 Build provenance and SBOM attestations are signed with GitHub Actions identity and
 pushed to GHCR. Rolling/release tags are promoted only after smoke tests, scan and
 attestation succeed. Workflow actions and scanner versions are pinned.
